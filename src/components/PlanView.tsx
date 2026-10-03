@@ -6,6 +6,7 @@ import VolumeChart from "./VolumeChart";
 import { CheckIcon } from "./icons";
 import PaceCard, { PaceLine } from "./PaceCard";
 import GoalCard from "./GoalCard";
+import ShiftCard from "./ShiftCard";
 import type { Goal } from "../lib/goal";
 import type { PaceModel } from "../lib/paces";
 
@@ -21,6 +22,9 @@ interface Props {
   /** Temps objectif de la course du plan */
   goal: Goal | null;
   onChangeGoal: (goal: Goal | null) => void;
+  canUndoShift: boolean;
+  onShift: (weeks: number) => void;
+  onUndoShift: () => void;
 }
 
 /** Index de la semaine en cours (ou la plus proche si le plan n'a pas commencé ou est terminé). */
@@ -32,7 +36,7 @@ export function currentWeekIndex(plan: Plan, today: string) {
 }
 
 /** Onglet « Programme » : le plan complet, semaine par semaine. */
-export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal }: Props) {
+export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal, canUndoShift, onShift, onUndoShift }: Props) {
   const today = todayISO();
   const currentIndex = currentWeekIndex(plan, today);
 
@@ -51,6 +55,8 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
       <GoalCard key={goal ? goal.minutes : "aucun"} race={plan.input.race} goal={goal} model={paces} onChange={onChangeGoal} />
 
       <PaceCard model={paces} manual={paceRef} onChangeManual={onChangePaceRef} />
+
+      <ShiftCard plan={plan} done={done} canUndo={canUndoShift} onShift={onShift} onUndo={onUndoShift} />
 
       <section className="weeks">
         {plan.weeks.map((w) => (
@@ -84,14 +90,14 @@ function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekP
   const range = `${fmtDate(week.startDate, { day: "numeric", month: "short" })} au ${fmtDate(end, { day: "numeric", month: "short" })}`;
 
   return (
-    <details className={`week week--${week.phase}${isCurrent ? " week--current" : ""}`} open={isCurrent}>
+    <details className={`week week--${week.phase}${isCurrent ? " week--current" : ""}${week.paused ? " week--paused" : ""}`} open={isCurrent}>
       <summary>
         <span className="week__title">Semaine {week.index + 1}</span>
         <span className="week__range">{range}</span>
-        <span className="week__phase">{week.isRecovery ? "Récupération" : PHASE_LABEL[week.phase]}</span>
+        <span className="week__phase">{week.paused ? "Pause" : week.isRecovery ? "Récupération" : PHASE_LABEL[week.phase]}</span>
         <span className="week__km">{fmtKm(week.totalKm)} km</span>
         <span className="week__done">
-          {doneCount}/{week.sessions.length}
+          {week.sessions.length === 0 ? "–" : `${doneCount}/${week.sessions.length}`}
         </span>
       </summary>
       <p className="week__focus">{week.focus}</p>

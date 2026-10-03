@@ -107,7 +107,7 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
           })}
         </ol>
         <p className="hint">
-          {weekDone}/{week.sessions.length} séances faites · {fmtKm(week.totalKm)} km prévus
+          {week.paused ? week.focus : `${weekDone}/${week.sessions.length} séances faites · ${fmtKm(week.totalKm)} km prévus`}
         </p>
         {upcoming.length > 1 && (
           <ul className="mini">

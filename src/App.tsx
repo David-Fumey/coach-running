@@ -2,6 +2,7 @@ import { useState } from "react";
 import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
+import { canUndoShift, shiftPlan } from "./lib/shift";
 import { EMPTY_SNAPSHOT, makeBackup, parseBackup, type Snapshot } from "./lib/backup";
 import { addActivity, removeActivity, updateActivity, type Activity } from "./lib/activities";
 import { todayISO, useStoredState } from "./storage";
@@ -31,6 +32,8 @@ export default function App() {
   const [paceRef, setPaceRef] = useStoredState<number | null>("foulee.pace.v1", null);
   // Temps objectif de course. Il appartient à une course : s'il ne correspond pas à celle du plan, il est ignoré.
   const [goal, setGoal] = useStoredState<Goal | null>("foulee.goal.v1", null);
+  // Plan d'avant le dernier décalage, pour pouvoir l'annuler. Pas dans la sauvegarde : c'est provisoire.
+  const [planBeforeShift, setPlanBeforeShift] = useStoredState<Plan | null>("foulee.planprev.v1", null);
   const [editing, setEditing] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [tab, setTab] = useState<Tab>("accueil");
@@ -50,6 +53,7 @@ export default function App() {
   function createPlan(values: PlanFormValues) {
     const next = generatePlan({ ...values, today: todayISO() });
     setPlan(next);
+    setPlanBeforeShift(null);
     setDone({});
     setActivities([]);
     strava.forgetHistory();
@@ -97,8 +101,25 @@ export default function App() {
     setFoods((prev) => [...prev, { ...f, id }]);
   }
 
+  /** Décale les séances à venir de `weeks` semaines (voir lib/shift.ts). Retourne un message d'erreur ou null. */
+  function shiftProgram(weeks: number): string | null {
+    if (!plan) return null;
+    const r = shiftPlan(plan, weeks, done, todayISO());
+    if (!r.ok) return r.error;
+    setPlanBeforeShift(plan);
+    setPlan(r.plan);
+    return null;
+  }
+
+  function undoShift() {
+    if (!planBeforeShift) return;
+    setPlan(planBeforeShift);
+    setPlanBeforeShift(null);
+  }
+
   function applySnapshot(d: Snapshot) {
     setPlan(d.plan);
+    setPlanBeforeShift(null);
     setDone(d.done);
     setActivities(d.activities);
     strava.forgetHistory();
@@ -226,7 +247,12 @@ export default function App() {
           />
         )}
         {tab === "programme" && (
-          <PlanView plan={plan} done={done} onToggle={toggle} onEdit={() => setEditing(true)} paces={paces} paceRef={paceRef} onChangePaceRef={setPaceRef} goal={planGoal} onChangeGoal={setGoal} />
+          <PlanView plan={plan} done={done} onToggle={toggle} onEdit={() => setEditing(true)} paces={paces} paceRef={paceRef} onChangePaceRef={setPaceRef} goal={planGoal}
+            onChangeGoal={setGoal}
+            canUndoShift={canUndoShift(planBeforeShift, plan, done, activities)}
+            onShift={shiftProgram}
+            onUndoShift={undoShift}
+          />
         )}
         {tab === "activites" && (
           <Activities
