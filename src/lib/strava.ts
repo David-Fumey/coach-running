@@ -20,7 +20,12 @@ export interface StravaState {
   lastSync: number | null;
   /** Courses déjà importées (même supprimées ensuite) : elles ne reviennent pas à la synchro suivante */
   seen: string[];
+  /** Version des données lues. En dessous de `STRAVA_SCHEMA`, la prochaine synchro relit tout l'historique. */
+  schema?: number;
 }
+
+/** 2 : fréquence cardiaque et dénivelé. */
+export const STRAVA_SCHEMA = 2;
 
 export const EMPTY_STRAVA: StravaState = { clientId: "", clientSecret: "", tokens: null, lastSync: null, seen: [] };
 
@@ -36,6 +41,11 @@ export interface StravaRun {
   moving_time: number;
   /** Heure locale de départ, suffixée « Z » à tort par Strava */
   start_date_local: string;
+  /** battements par minute, si la montre en a enregistré */
+  average_heartrate?: number;
+  max_heartrate?: number;
+  /** mètres de dénivelé positif */
+  total_elevation_gain?: number;
 }
 
 export const STRAVA_SOURCE = "strava";
@@ -94,6 +104,37 @@ export function isRun(r: StravaRun): boolean {
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
+/** Fréquence cardiaque plausible (30 à 250), sinon on ignore la valeur. */
+const heartRate = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 30 && x <= 250 ? Math.round(x) : undefined);
+const elevationOf = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 20000 ? Math.round(x) : undefined);
+
+type Details = Pick<Activity, "avgHr" | "maxHr" | "elevation">;
+
+function detailsOf(r: StravaRun): Details {
+  const out: Details = {};
+  const avg = heartRate(r.average_heartrate);
+  const max = heartRate(r.max_heartrate);
+  const up = elevationOf(r.total_elevation_gain);
+  if (avg !== undefined) out.avgHr = avg;
+  if (max !== undefined) out.maxHr = max;
+  if (up !== undefined) out.elevation = up;
+  return out;
+}
+
+function pickDetails(a: Activity): Details {
+  const out: Details = {};
+  if (a.avgHr !== undefined) out.avgHr = a.avgHr;
+  if (a.maxHr !== undefined) out.maxHr = a.maxHr;
+  if (a.elevation !== undefined) out.elevation = a.elevation;
+  return out;
+}
+
+/** Complète une activité avec les détails qui lui manquent, sans jamais écraser une valeur existante. */
+function withDetails(a: Activity, d: Details): Activity {
+  const missing = (Object.keys(d) as (keyof Details)[]).filter((k) => a[k] === undefined);
+  return missing.length === 0 ? a : { ...a, ...Object.fromEntries(missing.map((k) => [k, d[k]])) };
+}
+
 /** Course Strava → activité Foulée, ou null si ce n'est pas une course exploitable. */
 export function toActivity(r: StravaRun): Activity | null {
   if (!r || !Number.isFinite(r.id) || !isRun(r)) return null;
@@ -110,6 +151,7 @@ export function toActivity(r: StravaRun): Activity | null {
     minutes,
     source: STRAVA_SOURCE,
     externalId: stravaId(r.id),
+    ...detailsOf(r),
     ...(name ? { note: name } : {}),
   };
 }
@@ -121,6 +163,8 @@ export interface MergeResult {
   added: number;
   /** Activités saisies à la main reconnues comme la même course (rien n'est dupliqué) */
   matched: number;
+  /** Activités déjà connues qui ont reçu la fréquence cardiaque ou le dénivelé qui leur manquait */
+  enriched: number;
 }
 
 /**
@@ -135,6 +179,7 @@ export function mergeStrava(plan: Plan, state: Tracked, seen: string[], runs: St
   let current = state;
   let added = 0;
   let matched = 0;
+  let enriched = 0;
 
   const candidates = runs
     .map(toActivity)
@@ -144,15 +189,22 @@ export function mergeStrava(plan: Plan, state: Tracked, seen: string[], runs: St
 
   for (const a of candidates) {
     const ext = a.externalId!;
-    if (seenSet.has(ext) || current.activities.some((x) => x.externalId === ext)) {
+    const details = pickDetails(a);
+    const known = current.activities.find((x) => x.externalId === ext);
+    if (known || seenSet.has(ext)) {
       seenSet.add(ext);
+      const filled = known ? withDetails(known, details) : known;
+      if (known && filled !== known) {
+        current = { ...current, activities: current.activities.map((x) => (x === known ? filled! : x)) };
+        enriched++;
+      }
       continue;
     }
     seenSet.add(ext);
 
     const twin = current.activities.find((x) => !x.externalId && x.date === a.date && Math.abs(x.km - a.km) <= a.km * SAME_RUN_TOLERANCE);
     if (twin) {
-      current = { ...current, activities: current.activities.map((x) => (x === twin ? { ...x, source: STRAVA_SOURCE, externalId: ext } : x)) };
+      current = { ...current, activities: current.activities.map((x) => (x === twin ? withDetails({ ...x, source: STRAVA_SOURCE, externalId: ext }, details) : x)) };
       matched++;
       continue;
     }
@@ -162,7 +214,7 @@ export function mergeStrava(plan: Plan, state: Tracked, seen: string[], runs: St
     added++;
   }
 
-  return { state: current, seen: [...seenSet], added, matched };
+  return { state: current, seen: [...seenSet], added, matched, enriched };
 }
 
 /**

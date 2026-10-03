@@ -44,6 +44,30 @@ check("réponse mal formée ignorée", toActivity({ id: 10, sport_type: "Run", d
 check("date mal formée ignorée", toActivity(run(11, "2026-10-05", 5, 30, { start_date_local: "hier" })) === null);
 check("sans titre : pas de note", toActivity(run(12, "2026-10-05", 5, 30, { name: "  " }))!.note === undefined);
 
+// ---------- Fréquence cardiaque et dénivelé ----------
+const rich = toActivity(run(20, "2026-10-05", 10, 55, { average_heartrate: 151.6, max_heartrate: 178, total_elevation_gain: 123.4 }))!;
+check("fréquence cardiaque et dénivelé convertis", rich.avgHr === 152 && rich.maxHr === 178 && rich.elevation === 123, rich);
+const plain = toActivity(run(21, "2026-10-05", 10, 55))!;
+check("sans capteur : aucun champ", !("avgHr" in plain) && !("maxHr" in plain) && !("elevation" in plain), plain);
+const odd = toActivity(run(22, "2026-10-05", 10, 55, { average_heartrate: 0, max_heartrate: 400, total_elevation_gain: -5 }))!;
+check("valeurs aberrantes ignorées", odd.avgHr === undefined && odd.maxHr === undefined && odd.elevation === undefined, odd);
+const text2 = toActivity(run(23, "2026-10-05", 10, 55, { average_heartrate: "x" as unknown as number }))!;
+check("fréquence mal formée ignorée", text2.avgHr === undefined);
+check("dénivelé nul conservé (tapis)", toActivity(run(24, "2026-10-05", 10, 55, { total_elevation_gain: 0 }))!.elevation === 0);
+
+const old = mergeStrava(plan, empty, [], [run(30, "2026-10-04", 8, 48)]);
+const upgraded = mergeStrava(plan, old.state, old.seen, [run(30, "2026-10-04", 8, 48, { average_heartrate: 150, max_heartrate: 171, total_elevation_gain: 60 })]);
+check("activité déjà importée complétée", upgraded.enriched === 1 && upgraded.added === 0 && upgraded.state.activities.length === 1 && upgraded.state.activities[0].avgHr === 150 && upgraded.state.activities[0].elevation === 60, upgraded);
+const again = mergeStrava(plan, upgraded.state, upgraded.seen, [run(30, "2026-10-04", 8, 48, { average_heartrate: 150, max_heartrate: 171, total_elevation_gain: 60 })]);
+check("complétée une seule fois", again.enriched === 0);
+const noOverwrite = mergeStrava(plan, upgraded.state, upgraded.seen, [run(30, "2026-10-04", 8, 48, { average_heartrate: 99, max_heartrate: 120, total_elevation_gain: 5 })]);
+check("une valeur existante n'est jamais écrasée", noOverwrite.enriched === 0 && noOverwrite.state.activities[0].avgHr === 150 && noOverwrite.state.activities[0].elevation === 60);
+const afterDel = mergeStrava(plan, empty, old.seen, [run(30, "2026-10-04", 8, 48, { average_heartrate: 150 })]);
+check("course supprimée : ni réimportée ni complétée", afterDel.added === 0 && afterDel.enriched === 0 && afterDel.state.activities.length === 0);
+const userEdited: Tracked = { activities: [{ ...old.state.activities[0], km: 9, note: "ma note" }], done: {} };
+const keepEdits = mergeStrava(plan, userEdited, old.seen, [run(30, "2026-10-04", 8, 48, { average_heartrate: 150 })]);
+check("compléter ne touche pas aux modifications de l'utilisateur", keepEdits.state.activities[0].km === 9 && keepEdits.state.activities[0].note === "ma note" && keepEdits.state.activities[0].avgHr === 150);
+
 // ---------- Fusion ----------
 const m1 = mergeStrava(plan, empty, [], [run(100, s1.date, s1.km, 40)]);
 check("une course ajoutée", m1.added === 1 && m1.state.activities.length === 1 && m1.seen.includes("strava:100"));
@@ -72,6 +96,8 @@ const withManual = addActivity(empty, manual);
 const adopt = mergeStrava(plan, withManual, [], [run(105, s2.date, s2.km + 0.2, 40)]);
 check("saisie à la main reconnue, pas dupliquée", adopt.added === 0 && adopt.matched === 1 && adopt.state.activities.length === 1);
 check("saisie à la main conservée telle quelle", adopt.state.activities[0].feeling === 4 && adopt.state.activities[0].minutes === 41 && adopt.state.activities[0].externalId === "strava:105");
+const adoptRich = mergeStrava(plan, withManual, [], [run(110, s2.date, s2.km, 40, { average_heartrate: 148, total_elevation_gain: 30 })]);
+check("saisie reconnue : reçoit cœur et dénivelé", adoptRich.state.activities[0].avgHr === 148 && adoptRich.state.activities[0].elevation === 30 && adoptRich.state.activities[0].minutes === 41);
 const farApart = mergeStrava(plan, withManual, [], [run(106, s2.date, s2.km * 2, 80)]);
 check("distance très différente : ajoutée en plus", farApart.added === 1 && farApart.state.activities.length === 2);
 const other = mergeStrava(plan, withManual, [], [run(107, "2026-10-04", s2.km, 40)]);
@@ -160,6 +186,15 @@ check("la sauvegarde conserve l'origine Strava", back.ok && back.data.activities
 check("la sauvegarde ne contient aucun secret", !text.includes("clientSecret") && !text.includes("refreshToken") && !text.includes("accessToken"));
 const bad = JSON.parse(text);
 bad.data.activities[0].externalId = 42;
+const richText = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ ...imported[0], avgHr: 150, maxHr: 175, elevation: 80 }], done: {}, confirmed: true }, new Date());
+const richBack = parseBackup(richText);
+check("la sauvegarde conserve cœur et dénivelé", richBack.ok && richBack.data.activities[0].avgHr === 150 && richBack.data.activities[0].elevation === 80);
+const badHr = JSON.parse(richText);
+badHr.data.activities[0].avgHr = "150";
+check("fréquence invalide refusée", !parseBackup(JSON.stringify(badHr)).ok);
+badHr.data.activities[0].avgHr = 150;
+badHr.data.activities[0].elevation = -3;
+check("dénivelé négatif refusé", !parseBackup(JSON.stringify(badHr)).ok);
 check("externalId invalide refusé", !parseBackup(JSON.stringify(bad)).ok);
 check("état vide par défaut", EMPTY_STRAVA.tokens === null && EMPTY_STRAVA.seen.length === 0);
 

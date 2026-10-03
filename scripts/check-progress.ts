@@ -1,7 +1,7 @@
 import { generatePlan, weekdayIndex } from "../src/lib/plan.ts";
 import type { Activity } from "../src/lib/activities.ts";
 import {
-  WINDOW_SIZE, bucketsOf, clampStart, defaultSelection, defaultStart, inScope, niceTicks, nextStart, planRange, startOf,
+  WINDOW_SIZE, bucketsOf, extrasOf, clampStart, defaultSelection, defaultStart, inScope, niceTicks, nextStart, planRange, startOf,
 } from "../src/lib/progress.ts";
 
 let failures = 0;
@@ -75,6 +75,29 @@ function addDaysStr(d: string, n: number) {
   t.setUTCDate(t.getUTCDate() + n);
   return t.toISOString().slice(0, 10);
 }
+
+// ---------- Dénivelé et fréquence cardiaque ----------
+const rich = bucketsOf(
+  plan,
+  [
+    { ...act("r1", "2026-10-06", 10, 60), elevation: 100, avgHr: 150 },
+    { ...act("r2", "2026-10-07", 5, 20), elevation: 40, avgHr: 170 },
+    act("r3", "2026-10-08", 5, 30), // sans capteur ni dénivelé
+  ],
+  "programme", "semaine", today
+).find((b) => b.start === "2026-10-05")!;
+check("dénivelé cumulé", rich.elevation === 140, rich);
+check("fréquence moyenne pondérée par la durée", Math.abs(rich.hr! - (150 * 60 + 170 * 20) / 80) < 1e-9, rich.hr);
+const none = weeks.find((b) => b.start === "2026-10-12")!;
+check("sans donnée : null et non zéro", none.elevation === null && none.hr === null);
+const flat = bucketsOf(plan, [{ ...act("f1", "2026-10-06", 5, 30), elevation: 0 }], "programme", "semaine", today).find((b) => b.start === "2026-10-05")!;
+check("dénivelé nul enregistré : zéro", flat.elevation === 0);
+const mixedMonth = bucketsOf(plan, [{ ...act("m1", "2026-10-06", 5, 30), elevation: 20 }, { ...act("m2", "2026-10-20", 5, 30), elevation: 30 }], "total", "mois", today);
+check("dénivelé par mois", mixedMonth[mixedMonth.length - 1].elevation === 50);
+
+const ex = extrasOf([{ ...act("e1", "2026-10-06", 10, 60), elevation: 100, avgHr: 150 }, { ...act("e2", "2026-10-07", 5, 20), elevation: 40, avgHr: 170 }, act("e3", "2026-10-08", 5, 30)]);
+check("totaux : dénivelé et fréquence moyenne", ex.elevation === 140 && Math.abs(ex.hr! - (150 * 60 + 170 * 20) / 80) < 1e-9, ex);
+check("totaux sans donnée : null", extrasOf([act("n1", "2026-10-06", 5, 30)]).elevation === null && extrasOf([]).hr === null);
 
 // ---------- Fenêtre ----------
 check("fenêtre bornée", clampStart(30, 24, -3) === 0 && clampStart(30, 24, 99) === 6 && clampStart(10, 24, 5) === 0);

@@ -17,6 +17,11 @@ export interface Activity {
   source?: string;
   /** Identifiant dans le service d'origine, pour ne jamais importer deux fois la même sortie */
   externalId?: string;
+  /** Fréquence cardiaque moyenne et maximale, en battements par minute (importées) */
+  avgHr?: number;
+  maxHr?: number;
+  /** Dénivelé positif en mètres (importé) */
+  elevation?: number;
 }
 
 export const FEELINGS: Record<number, string> = {

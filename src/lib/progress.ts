@@ -21,6 +21,10 @@ export interface Bucket {
   count: number;
   /** min/km moyen de la période, null sans course */
   pace: number | null;
+  /** Dénivelé positif cumulé en mètres, null si aucune sortie de la période n'a de dénivelé enregistré */
+  elevation: number | null;
+  /** Fréquence cardiaque moyenne (pondérée par la durée des sorties qui en ont une), null sans donnée */
+  hr: number | null;
   /** Kilomètres prévus au plan sur la période (portée « programme » seulement) */
   plannedKm: number | null;
   /** La période commence après aujourd'hui */
@@ -28,6 +32,19 @@ export interface Bucket {
   /** Aujourd'hui est dans la période */
   current: boolean;
 }
+
+interface Acc {
+  km: number;
+  minutes: number;
+  count: number;
+  planned: number;
+  elevation: number;
+  hasElevation: boolean;
+  hrWeighted: number;
+  hrMinutes: number;
+}
+
+const newAcc = (): Acc => ({ km: 0, minutes: 0, count: 0, planned: 0, elevation: 0, hasElevation: false, hrWeighted: 0, hrMinutes: 0 });
 
 export function startOf(date: string, grain: Grain): string {
   if (grain === "semaine") return addDays(date, -weekdayIndex(date));
@@ -73,11 +90,11 @@ export function bucketsOf(plan: Plan, activities: Activity[], scope: Scope, grai
     last = scoped.reduce((m, a) => (a.date > m ? a.date : m), today);
   }
 
-  const acc = new Map<string, { km: number; minutes: number; count: number; planned: number }>();
+  const acc = new Map<string, Acc>();
   const slot = (date: string) => {
     const key = startOf(date, grain);
     let s = acc.get(key);
-    if (!s) acc.set(key, (s = { km: 0, minutes: 0, count: 0, planned: 0 }));
+    if (!s) acc.set(key, (s = newAcc()));
     return s;
   };
   for (const a of scoped) {
@@ -85,6 +102,14 @@ export function bucketsOf(plan: Plan, activities: Activity[], scope: Scope, grai
     s.km += a.km;
     s.minutes += a.minutes;
     s.count++;
+    if (a.elevation !== undefined) {
+      s.elevation += a.elevation;
+      s.hasElevation = true;
+    }
+    if (a.avgHr !== undefined) {
+      s.hrWeighted += a.avgHr * a.minutes;
+      s.hrMinutes += a.minutes;
+    }
   }
   if (scope === "programme") {
     for (const w of plan.weeks) for (const x of w.sessions) slot(x.date).planned += x.km;
@@ -93,7 +118,7 @@ export function bucketsOf(plan: Plan, activities: Activity[], scope: Scope, grai
   const out: Bucket[] = [];
   const stop = startOf(last, grain);
   for (let start = startOf(first, grain); start <= stop; start = nextStart(start, grain)) {
-    const s = acc.get(start) ?? { km: 0, minutes: 0, count: 0, planned: 0 };
+    const s = acc.get(start) ?? newAcc();
     const next = nextStart(start, grain);
     out.push({
       start,
@@ -102,12 +127,36 @@ export function bucketsOf(plan: Plan, activities: Activity[], scope: Scope, grai
       minutes: s.minutes,
       count: s.count,
       pace: s.km > 0 ? s.minutes / s.km : null,
+      elevation: s.hasElevation ? s.elevation : null,
+      hr: s.hrMinutes > 0 ? s.hrWeighted / s.hrMinutes : null,
       plannedKm: scope === "programme" ? s.planned : null,
       future: start > today,
       current: start <= today && today < next,
     });
   }
   return out;
+}
+
+export interface Extras {
+  /** Dénivelé positif cumulé en mètres, null si aucune activité n'en a */
+  elevation: number | null;
+  /** Fréquence cardiaque moyenne pondérée par la durée, null sans donnée */
+  hr: number | null;
+}
+
+/** Dénivelé et fréquence cardiaque d'un ensemble d'activités (celles sans donnée sont laissées de côté). */
+export function extrasOf(activities: Activity[]): Extras {
+  let elevation: number | null = null;
+  let weighted = 0;
+  let minutes = 0;
+  for (const a of activities) {
+    if (a.elevation !== undefined) elevation = (elevation ?? 0) + a.elevation;
+    if (a.avgHr !== undefined) {
+      weighted += a.avgHr * a.minutes;
+      minutes += a.minutes;
+    }
+  }
+  return { elevation, hr: minutes > 0 ? weighted / minutes : null };
 }
 
 /** Garde la fenêtre de `size` périodes dans les limites. */

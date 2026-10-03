@@ -59,7 +59,8 @@ function validActivity(a: unknown): a is Activity {
     (a.feeling === undefined || (isNum(a.feeling) && a.feeling >= 1 && a.feeling <= 5)) &&
     (a.note === undefined || typeof a.note === "string") &&
     (a.source === undefined || typeof a.source === "string") &&
-    (a.externalId === undefined || typeof a.externalId === "string")
+    (a.externalId === undefined || typeof a.externalId === "string") &&
+    isOptNum(a.avgHr) && isOptNum(a.maxHr) && isOptNum(a.elevation)
   );
 }
 
