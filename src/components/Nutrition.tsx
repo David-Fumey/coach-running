@@ -14,6 +14,7 @@ import {
 } from "../lib/nutrition";
 import { fmtDate, fmtDuration, fmtKm } from "../lib/format";
 import { todayISO } from "../storage";
+import Advice from "./Advice";
 import ProfileForm from "./ProfileForm";
 import { Ring } from "./icons";
 
@@ -31,8 +32,32 @@ interface Props {
 
 const KIND_SHORT: Record<DayKind, string> = { repos: "Repos", facile: "Facile", intense: "Intense", long: "Long", course: "Course" };
 
-/** Onglet « Nutrition » : objectifs du jour selon la charge, et journal alimentaire. */
+type View = "jour" | "conseils";
+
+/** Onglet « Nutrition » : le suivi du jour d'un côté, les conseils de l'autre. */
 export default function Nutrition(props: Props) {
+  const [view, setView] = useState<View>("jour");
+  return (
+    <div className="nutrition-tab">
+      <div className="segmented" role="group" aria-label="Section nutrition">
+        <button type="button" aria-pressed={view === "jour"} onClick={() => setView("jour")}>
+          Suivi du jour
+        </button>
+        <button type="button" aria-pressed={view === "conseils"} onClick={() => setView("conseils")}>
+          Conseils
+        </button>
+      </div>
+      {view === "jour" ? (
+        <Daily {...props} />
+      ) : (
+        <Advice plan={props.plan} profile={props.profile} onOpenProfile={props.onOpenProfile} />
+      )}
+    </div>
+  );
+}
+
+/** Objectifs du jour selon la charge, et journal alimentaire. */
+function Daily(props: Props) {
   const { plan, done, activities, profile, foods, onSaveProfile } = props;
   const today = todayISO();
   const [date, setDate] = useState(today);
