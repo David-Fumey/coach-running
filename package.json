@@ -10,7 +10,8 @@
     "test:plan": "node --experimental-strip-types scripts/check-plan.ts",
     "test:activities": "node --experimental-strip-types scripts/check-activities.ts",
     "test:nutrition": "node --experimental-strip-types scripts/check-nutrition.ts",
-    "test:backup": "node --experimental-strip-types scripts/check-backup.ts"
+    "test:backup": "node --experimental-strip-types scripts/check-backup.ts",
+    "test:advice": "node --experimental-strip-types scripts/check-advice.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",
