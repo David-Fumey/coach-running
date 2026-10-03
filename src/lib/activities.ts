@@ -29,6 +29,8 @@ export interface Activity {
   elevation?: number;
   /** Meilleurs efforts de la sortie (importés ; absent tant que le détail n'a pas été lu) */
   efforts?: Efforts;
+  /** Température moyenne relevée par la montre, en °C (importée) ; null = détail lu, pas de capteur ; absent = pas encore lu */
+  temp?: number | null;
 }
 
 export const FEELINGS: Record<number, string> = {

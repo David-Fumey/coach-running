@@ -25,6 +25,7 @@ const full: Snapshot = {
   paceRef: 6.25,
   goal: { race: "10k", minutes: 47.5 },
   water: [{ id: "w1", date: "2026-10-05", ml: 250 }, { id: "w2", date: "2026-10-05", ml: 500 }],
+  sweat: [{ id: "p1", date: "2026-10-05", km: 10, minutes: 60, before: 70, after: 69.3, drankMl: 200, conditions: "temperee" }],
 };
 const text = makeBackup(full, new Date("2026-10-05T10:00:00Z"));
 
@@ -69,6 +70,15 @@ check("hydratation invalide", err(mutate((o) => (o.data.water[0].ml = 0))) !== n
 check("hydratation absente : liste vide", (() => {
   const r = parseBackup(mutate((o) => delete o.data.water));
   return r.ok && r.data.water.length === 0;
+})());
+check("pesée invalide", err(mutate((o) => (o.data.sweat[0].after = 99))) !== null && err(mutate((o) => (o.data.sweat[0].conditions = "tropicale"))) !== null && err(mutate((o) => (o.data.sweat[0].minutes = 5))) !== null && err(mutate((o) => (o.data.sweat = "x"))) !== null);
+check("pesées absentes : liste vide", (() => {
+  const r = parseBackup(mutate((o) => delete o.data.sweat));
+  return r.ok && r.data.sweat.length === 0;
+})());
+check("température d'activité", (() => {
+  const t = (v: unknown) => parseBackup(mutate((o) => (o.data.activities[0].temp = v))).ok;
+  return t(21.5) && t(null) && t(-8) && !t("chaud") && !t(120);
 })());
 check("séances validées invalides", err(mutate((o) => (o.data.done = { x: "oui" }))) !== null);
 check("sans plan, jamais confirmé", (() => {

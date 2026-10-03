@@ -275,6 +275,46 @@ export function effortCandidates(
   return [...chosen.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, max);
 }
 
+/** Température moyenne (°C) du détail d'une activité Strava ; null si la montre n'en a pas relevé. */
+export function parseTemp(raw: unknown): number | null {
+  const t = (raw as { average_temp?: unknown } | null)?.average_temp;
+  return typeof t === "number" && Number.isFinite(t) && t >= -60 && t <= 60 ? t : null;
+}
+
+/** Nombre de sorties récentes dont on lit le détail pour en connaître la température. */
+export const RECENT_TEMP_COUNT = 8;
+
+/**
+ * Activités dont il faut lire le détail : les plus récentes dont la température est inconnue (elle ne figure que dans
+ * le détail), puis celles qui peuvent cacher un meilleur effort. Le total est plafonné pour ménager les quotas.
+ */
+export function detailTargets(activities: Activity[], perDistance = EFFORT_CANDIDATES_PER_DISTANCE, max = EFFORT_BATCH): Activity[] {
+  const recent = activities
+    .filter((a) => stravaNumericId(a) !== null && a.temp === undefined)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+    .slice(0, RECENT_TEMP_COUNT);
+  const out = new Map<string, Activity>();
+  for (const a of recent) out.set(a.id, a);
+  for (const a of effortCandidates(activities, perDistance, Infinity)) out.set(a.id, a);
+  return [...out.values()].slice(0, max);
+}
+
+export interface DetailsRead {
+  efforts: Map<string, Efforts>;
+  temps: Map<string, number | null>;
+}
+
+/** Enregistre ce que le détail a appris (efforts, température) sans jamais écraser une valeur déjà connue. */
+export function applyDetails(activities: Activity[], read: DetailsRead): Activity[] {
+  return activities.map((a) => {
+    if (!a.externalId) return a;
+    const efforts = a.efforts === undefined ? read.efforts.get(a.externalId) : undefined;
+    const temp = a.temp === undefined && read.temps.has(a.externalId) ? read.temps.get(a.externalId) : undefined;
+    if (efforts === undefined && temp === undefined) return a;
+    return { ...a, ...(efforts !== undefined ? { efforts } : {}), ...(temp !== undefined ? { temp } : {}) };
+  });
+}
+
 /** Enregistre les efforts lus (par identifiant externe) sans toucher au reste des activités. */
 export function applyEfforts(activities: Activity[], byExternalId: Map<string, Efforts>): Activity[] {
   return activities.map((a) => (a.externalId && byExternalId.has(a.externalId) && a.efforts === undefined ? { ...a, efforts: byExternalId.get(a.externalId)! } : a));

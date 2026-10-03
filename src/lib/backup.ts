@@ -5,7 +5,7 @@ import type { Plan } from "./plan.ts";
 import type { Activity } from "./activities.ts";
 import { isValidPace } from "./paces.ts";
 import { validGoal, type Goal } from "./goal.ts";
-import { validAmount, type Water } from "./hydration.ts";
+import { CONDITIONS, validAmount, validateWeighing, type Water, type Weighing } from "./hydration.ts";
 import { GOALS, validateProfile, type Food, type Profile } from "./nutrition.ts";
 
 export interface Snapshot {
@@ -21,9 +21,11 @@ export interface Snapshot {
   goal: Goal | null;
   /** Boissons enregistrées dans le suivi d'hydratation */
   water: Water[];
+  /** Pesées avant / après une sortie, pour étalonner la transpiration */
+  sweat: Weighing[];
 }
 
-export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null, water: [] };
+export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null, water: [], sweat: [] };
 
 /** Identifiant interne, resté « foulee » (ancien nom de l'application) pour que les anciennes sauvegardes restent lisibles. */
 const APP = "foulee";
@@ -77,7 +79,8 @@ function validActivity(a: unknown): a is Activity {
     (a.source === undefined || typeof a.source === "string") &&
     (a.externalId === undefined || typeof a.externalId === "string") &&
     isOptNum(a.avgHr) && isOptNum(a.maxHr) && isOptNum(a.elevation) &&
-    (a.efforts === undefined || validEfforts(a.efforts))
+    (a.efforts === undefined || validEfforts(a.efforts)) &&
+    (a.temp === undefined || a.temp === null || (isNum(a.temp) && a.temp >= -60 && a.temp <= 60))
   );
 }
 
@@ -94,6 +97,11 @@ function validFood(f: unknown): f is Food {
 
 function validWater(w: unknown): w is Water {
   return isObj(w) && typeof w.id === "string" && isDate(w.date) && validAmount(w.ml);
+}
+
+function validWeighing(w: unknown): w is Weighing {
+  if (!isObj(w) || typeof w.id !== "string" || !isDate(w.date) || typeof w.conditions !== "string" || !(w.conditions in CONDITIONS)) return false;
+  return [w.km, w.minutes, w.before, w.after, w.drankMl].every(isNum) && validateWeighing(w as unknown as Weighing) === null;
 }
 
 function validProfile(p: unknown): p is Profile {
@@ -128,6 +136,7 @@ export function parseBackup(text: string): ParseResult {
   const paceRef = d.paceRef ?? null;
   const goal = d.goal ?? null;
   const water = d.water ?? [];
+  const sweat = d.sweat ?? [];
 
   if (plan !== null && !validPlan(plan)) return { ok: false, error: "Le plan contenu dans le fichier est invalide." };
   if (!isObj(done) || !Object.values(done).every((v) => v === true)) return { ok: false, error: "Les séances validées du fichier sont invalides." };
@@ -137,6 +146,7 @@ export function parseBackup(text: string): ParseResult {
   if (typeof confirmed !== "boolean") return { ok: false, error: "Le fichier est invalide." };
   if (paceRef !== null && !isValidPace(paceRef)) return { ok: false, error: "L'allure moyenne du fichier est invalide." };
   if (!Array.isArray(water) || !water.every(validWater)) return { ok: false, error: "Le suivi d'hydratation du fichier est invalide." };
+  if (!Array.isArray(sweat) || !sweat.every(validWeighing)) return { ok: false, error: "Les pesées du fichier sont invalides." };
   if (goal !== null && !validGoal(goal)) return { ok: false, error: "Le temps objectif du fichier est invalide." };
 
   return {
@@ -150,6 +160,7 @@ export function parseBackup(text: string): ParseResult {
       paceRef: paceRef as number | null,
       goal: goal as Goal | null,
       water: water as Water[],
+      sweat: sweat as Weighing[],
       confirmed: plan === null ? false : confirmed,
     },
   };

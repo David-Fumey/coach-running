@@ -1,7 +1,7 @@
 import type { Activity } from "../src/lib/activities.ts";
 import type { Profile } from "../src/lib/nutrition.ts";
 import {
-  CONDITIONS, DEFAULT_BASE_ML, QUICK_AMOUNTS, baseMl, duringRange, hydrationTarget, lastActivity, progressOf, replaceRange, sweatLoss, totalMl, validAmount,
+  CONDITIONS, DEFAULT_BASE_ML, calibration, conditionsFromTemp, hydrationTargetFromLoss, measuredLossMl, sweatRate, validateWeighing, weighingRatio, type Weighing, QUICK_AMOUNTS, baseMl, duringRange, hydrationTarget, lastActivity, progressOf, replaceRange, sweatLoss, totalMl, validAmount,
 } from "../src/lib/hydration.ts";
 
 let failures = 0;
@@ -31,6 +31,40 @@ check("proportionnel à la distance et au poids", sweatLoss(20, 70).ml === 2 * 7
 check("sortie nulle : aucune perte", sweatLoss(0, 70).ml === 0);
 check("ordre low ≤ ml ≤ high", [0.5, 5, 12, 21, 42].every((km) => { const e = sweatLoss(km, 65); return e.low <= e.ml && e.ml <= e.high; }));
 check("un semi fait dépasser 2 % du poids en chaleur", sweatLoss(21, 60, "chaude").percentOfBody > 2, sweatLoss(21, 60, "chaude"));
+
+// ---------- Température ----------
+check("conditions d'après la température", conditionsFromTemp(5) === "fraiche" && conditionsFromTemp(11.9) === "fraiche" && conditionsFromTemp(12) === "temperee" && conditionsFromTemp(22) === "temperee" && conditionsFromTemp(22.1) === "chaude" && conditionsFromTemp(35) === "chaude");
+check("température inconnue : pas de conditions", conditionsFromTemp(null) === null && conditionsFromTemp(undefined) === null && conditionsFromTemp(NaN) === null);
+check("ajustement personnel appliqué à l'estimation", sweatLoss(10, 70, "temperee", 1.2).ml === 920 && sweatLoss(10, 70, "temperee", 0.5).ml === 390, [sweatLoss(10, 70, "temperee", 1.2).ml, sweatLoss(10, 70, "temperee", 0.5).ml]);
+check("ajustement personnel dans l'objectif du jour", hydrationTarget(prof(70), 10, 1.2).training === 920 && hydrationTarget(prof(70), 10, 1.2).total === 3000);
+check("objectif d'après une perte connue", hydrationTargetFromLoss(prof(70), 1000).total === 3100 && hydrationTargetFromLoss(null, 0).total === DEFAULT_BASE_ML);
+
+// ---------- Pesées ----------
+const wg = (extra: Partial<Weighing> = {}): Weighing => ({ id: "p", date: "2026-10-01", km: 10, minutes: 60, before: 70, after: 69.3, drankMl: 200, conditions: "temperee", ...extra });
+check("perte mesurée = masse perdue + boisson", measuredLossMl(wg()) === 900, measuredLossMl(wg()));
+check("taux de transpiration en ml/h", sweatRate(wg()) === 900 && sweatRate(wg({ minutes: 45 })) === 1200);
+check("rapport mesure / modèle", near(weighingRatio(wg()), 900 / 770, 1e-6), weighingRatio(wg()));
+check("le rapport neutralise les conditions de la sortie", near(weighingRatio(wg({ conditions: "chaude" })), 900 / (770 * 1.35), 1e-6));
+check("pesée valide", validateWeighing(wg()) === null);
+check("pesées invalides", [
+  wg({ before: 20 }), wg({ after: 250 }), wg({ drankMl: -5 }), wg({ drankMl: 9000 }), wg({ minutes: 10 }), wg({ km: 0 }),
+  wg({ before: 80, after: 70 }), wg({ after: 70, drankMl: 0 }), wg({ before: 70, after: 69.99, drankMl: 0 }), wg({ minutes: 20, before: 70, after: 65 }),
+  wg({ before: NaN }),
+].every((w) => validateWeighing(w) !== null));
+check("durée minimale pour mesurer", validateWeighing(wg({ minutes: 20 })) === null && validateWeighing(wg({ minutes: 19 })) !== null);
+check("sans pesée : pas d'ajustement", calibration([]) === null);
+const one = calibration([wg({ drankMl: 200 })])!;
+check("une pesée : un tiers de l'écart seulement", one.count === 1 && near(one.trust, 1 / 3, 1e-9) && near(one.factor, 1 + (900 / 770 - 1) / 3, 1e-3), one);
+const three = calibration([wg(), wg({ id: "q" }), wg({ id: "r" })])!;
+check("trois pesées : écart appliqué en entier", three.trust === 1 && near(three.factor, 900 / 770, 1e-3), three);
+const robust = calibration([wg(), wg({ id: "q" }), wg({ id: "r" }), wg({ id: "s", drankMl: 2500 })])!;
+check("la médiane résiste à une pesée aberrante", near(robust.factor, 900 / 770, 1e-3) || robust.factor < 2, robust);
+const low = calibration([wg({ before: 70, after: 69.8, drankMl: 0, id: "a" }), wg({ before: 70, after: 69.8, drankMl: 0, id: "b" }), wg({ before: 70, after: 69.8, drankMl: 0, id: "c" })])!;
+check("peu de transpiration : facteur inférieur à 1, plancher à 0,5", low.factor < 1 && low.factor >= 0.5, low);
+const huge = calibration([wg({ before: 70, after: 68, drankMl: 1000, id: "a", km: 5 }), wg({ before: 70, after: 68, drankMl: 1000, id: "b", km: 5 }), wg({ before: 70, after: 68, drankMl: 1000, id: "c", km: 5 })])!;
+check("facteur plafonné à 2", huge.factor === 2, huge);
+check("taux moyen, arrondi à 10", calibration([wg({ id: "a" }), wg({ id: "b", minutes: 45 })])!.ratePerHour === 1050);
+check("pesées invalides écartées du calcul", calibration([wg({ minutes: 5 })]) === null);
 
 // ---------- À boire ----------
 check("après : 120 à 150 % de la perte", (() => { const r = replaceRange(800); return r.low === 950 && r.high === 1200; })(), replaceRange(800));

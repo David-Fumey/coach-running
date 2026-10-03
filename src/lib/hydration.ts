@@ -68,10 +68,20 @@ export interface SweatEstimate {
   percentOfBody: number;
 }
 
-/** Eau perdue par la sueur pendant une course de `km` kilomètres. */
-export function sweatLoss(km: number, weightKg: number, conditions: Conditions = "temperee"): SweatEstimate {
-  const kcal = km * weightKg * RUN_KCAL_PER_KG_KM;
-  const center = kcal * SWEAT_ML_PER_KCAL * CONDITIONS[conditions].factor;
+/** Estimation du modèle seul, sans arrondi ni ajustement personnel. */
+function rawSweat(km: number, weightKg: number, conditions: Conditions): number {
+  return km * weightKg * RUN_KCAL_PER_KG_KM * SWEAT_ML_PER_KCAL * CONDITIONS[conditions].factor;
+}
+
+/** Classe de conditions d'après une température en °C ; null si la température est inconnue. */
+export function conditionsFromTemp(temp: number | null | undefined): Conditions | null {
+  if (typeof temp !== "number" || !Number.isFinite(temp)) return null;
+  return temp < 12 ? "fraiche" : temp <= 22 ? "temperee" : "chaude";
+}
+
+/** Eau perdue par la sueur pendant une course de `km` kilomètres. `factor` : ajustement personnel issu des pesées. */
+export function sweatLoss(km: number, weightKg: number, conditions: Conditions = "temperee", factor = 1): SweatEstimate {
+  const center = rawSweat(km, weightKg, conditions) * factor;
   return {
     ml: round10(center),
     low: round10(center * (1 - SWEAT_UNCERTAINTY)),
@@ -100,10 +110,15 @@ export interface HydrationTarget {
   total: number;
 }
 
-export function hydrationTarget(profile: Profile | null, trainingKm: number): HydrationTarget {
+export function hydrationTarget(profile: Profile | null, trainingKm: number, factor = 1): HydrationTarget {
+  const training = trainingKm > 0 ? sweatLoss(trainingKm, profile?.weightKg ?? DEFAULT_WEIGHT_KG, "temperee", factor).ml : 0;
+  return hydrationTargetFromLoss(profile, training);
+}
+
+/** Objectif quand la perte du jour est déjà connue (par exemple avec la température relevée par la montre). */
+export function hydrationTargetFromLoss(profile: Profile | null, trainingMl: number): HydrationTarget {
   const base = baseMl(profile);
-  const training = trainingKm > 0 ? sweatLoss(trainingKm, profile?.weightKg ?? DEFAULT_WEIGHT_KG).ml : 0;
-  return { base, training, total: round50(base + training) };
+  return { base, training: trainingMl, total: round50(base + trainingMl) };
 }
 
 export function totalMl(entries: Water[], date: string): number {
@@ -131,4 +146,83 @@ export function lastActivity(activities: Activity[], today: string): Activity | 
 /** Entrée valide pour l'ajout ou l'import. */
 export function validAmount(ml: unknown): ml is number {
   return typeof ml === "number" && Number.isFinite(ml) && ml >= MIN_ENTRY_ML && ml <= MAX_ENTRY_ML;
+}
+
+// ---------- Pesées avant / après : étalonner sa propre transpiration ----------
+
+export interface Weighing {
+  id: string;
+  /** Jour de la sortie */
+  date: string;
+  km: number;
+  minutes: number;
+  /** Poids avant et après la sortie, en kg */
+  before: number;
+  after: number;
+  /** Ce qui a été bu pendant la sortie, en ml */
+  drankMl: number;
+  /** Conditions retenues pour la sortie (température de la montre ou choix manuel) */
+  conditions: Conditions;
+}
+
+/** En dessous, l'écart de poids se perd dans l'erreur de la balance. */
+export const MIN_WEIGHING_MINUTES = 20;
+const MAX_RATE_ML_PER_HOUR = 3500;
+const MIN_LOSS_ML = 100;
+
+/** Eau perdue, mesurée : la masse perdue plus ce qui a été bu. (Un peu de la perte vient de la respiration.) */
+export const measuredLossMl = (w: Pick<Weighing, "before" | "after" | "drankMl">) => Math.round((w.before - w.after) * 1000 + w.drankMl);
+
+/** Taux de transpiration mesuré, en ml par heure. */
+export const sweatRate = (w: Pick<Weighing, "before" | "after" | "drankMl" | "minutes">) => measuredLossMl(w) / (w.minutes / 60);
+
+/** Rapport entre la perte mesurée et celle que le modèle prédisait pour les mêmes conditions. */
+export function weighingRatio(w: Omit<Weighing, "id" | "date">): number {
+  return measuredLossMl(w) / rawSweat(w.km, w.before, w.conditions);
+}
+
+/** Retourne un message d'erreur, ou null si la pesée est exploitable. */
+export function validateWeighing(w: Omit<Weighing, "id" | "date">): string | null {
+  const ok = (x: number, lo: number, hi: number) => Number.isFinite(x) && x >= lo && x <= hi;
+  if (!ok(w.before, 30, 200) || !ok(w.after, 30, 200)) return "Indique des poids entre 30 et 200 kg (par exemple 68,4).";
+  if (!ok(w.drankMl, 0, 5000)) return "Ce que tu as bu pendant la sortie doit être entre 0 et 5 000 ml.";
+  if (!ok(w.km, 0.5, 250) || !(w.conditions in CONDITIONS)) return "La sortie n'est pas valide.";
+  if (!ok(w.minutes, MIN_WEIGHING_MINUTES, 24 * 60)) return `Une sortie de moins de ${MIN_WEIGHING_MINUTES} minutes ne permet pas une mesure fiable : la balance n'est pas assez précise.`;
+  if (w.before - w.after > 6) return "Plus de 6 kg d'écart : vérifie les deux pesées.";
+  if (measuredLossMl(w) < MIN_LOSS_ML) return "Perte trop faible pour être mesurée. Vérifie les pesées et le volume bu (tu as peut-être beaucoup bu ou mal lu la balance).";
+  if (sweatRate(w) > MAX_RATE_ML_PER_HOUR) return "Cette perte par heure n'est pas plausible : vérifie les pesées et le volume bu.";
+  return null;
+}
+
+export interface Calibration {
+  /** Multiplicateur à appliquer au modèle (1 = aucun ajustement) */
+  factor: number;
+  count: number;
+  /** Confiance accordée à la mesure, de 0 à 1 : une seule pesée ne suffit pas à corriger tout l'écart */
+  trust: number;
+  /** Taux de transpiration moyen mesuré, en ml par heure */
+  ratePerHour: number;
+}
+
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/**
+ * Ajustement personnel tiré des pesées : médiane des rapports mesure / modèle, bornée entre 0,5 et 2,
+ * et appliquée progressivement (un tiers avec une pesée, deux tiers avec deux, en entier à partir de trois).
+ */
+export function calibration(weighings: Weighing[]): Calibration | null {
+  const good = weighings.filter((w) => validateWeighing(w) === null);
+  if (good.length === 0) return null;
+  const ratio = Math.min(2, Math.max(0.5, median(good.map(weighingRatio))));
+  const trust = Math.min(1, good.length / 3);
+  return {
+    factor: Math.round((1 + (ratio - 1) * trust) * 1000) / 1000,
+    count: good.length,
+    trust,
+    ratePerHour: Math.round(good.reduce((s, w) => s + sweatRate(w), 0) / good.length / 10) * 10,
+  };
 }

@@ -2,7 +2,7 @@ import { generatePlan } from "../src/lib/plan.ts";
 import { addActivity, removeActivity, type Activity, type Tracked } from "../src/lib/activities.ts";
 import { makeBackup, parseBackup, EMPTY_SNAPSHOT } from "../src/lib/backup.ts";
 import {
-  EMPTY_STRAVA, applyEfforts, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
+  EMPTY_STRAVA, RECENT_TEMP_COUNT, applyDetails, applyEfforts, detailTargets, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
   type StravaRun, type StravaTokens,
 } from "../src/lib/strava.ts";
 import { StravaError, fetchEfforts, fetchRuns, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
@@ -135,8 +135,35 @@ check("des efforts déjà lus ne sont pas écrasés", keep.find((a) => a.id === 
   const refused = await fetchEfforts("tok", [1, 2], async () => respE(401, {}));
   check("accès refusé : arrêt", refused.stopped?.kind === "autorisation");
   const all = await fetchEfforts("tok", [1, 2], async () => respE(200, detail));
+  const tempRes = await fetchEfforts("tok", [1, 2, 3], async (u) => {
+    if (u.includes("/activities/1?")) return respE(200, { ...detail, average_temp: 24 });
+    if (u.includes("/activities/2?")) return respE(200, detail);
+    return respE(404, {});
+  });
+  check("température lue avec les efforts", tempRes.temps.get(1) === 24 && tempRes.temps.get(2) === null && tempRes.temps.get(3) === null && tempRes.efforts.size === 3);
   check("tout lu : pas d'arrêt", all.stopped === null && all.efforts.size === 2);
 }
+
+// ---------- Température et détails ----------
+check("température lue dans le détail", parseTemp({ average_temp: 21 }) === 21 && parseTemp({ average_temp: -3.5 }) === -3.5 && parseTemp({ average_temp: 0 }) === 0);
+check("pas de capteur : null", parseTemp({}) === null && parseTemp(null) === null && parseTemp({ average_temp: "21" }) === null && parseTemp({ average_temp: 200 }) === null && parseTemp({ average_temp: NaN }) === null);
+
+const dAct = (n: number, extra: Partial<Activity> = {}): Activity => ({ id: `strava-${n}`, date: `2026-09-${String(n).padStart(2, "0")}`, km: 6, minutes: 36, externalId: `strava:${n}`, source: "strava", ...extra });
+const many = Array.from({ length: 20 }, (_, i) => dAct(i + 1));
+const targets = detailTargets(many, 0, 99);
+check("détails : les plus récentes sans température d'abord", targets.length === RECENT_TEMP_COUNT && targets[0].id === "strava-20" && targets.every((a) => Number(a.id.slice(7)) > 20 - RECENT_TEMP_COUNT), targets.map((a) => a.id));
+check("une sortie dont la température est connue (même absente) n'est pas relue", !detailTargets([dAct(5, { temp: 18 }), dAct(6, { temp: null })], 0, 99).length);
+check("sortie manuelle ignorée", detailTargets([{ id: "m", date: "2026-09-30", km: 6, minutes: 36 }], 0, 99).length === 0);
+const withEff = detailTargets([...many.slice(0, 18), dAct(19, { temp: 20 }), dAct(20, { temp: 20 })], 6, 99);
+check("les efforts s'ajoutent aux températures, sans doublon", new Set(withEff.map((a) => a.id)).size === withEff.length && withEff.length > RECENT_TEMP_COUNT - 2, withEff.length);
+check("plafonné", detailTargets(many, 6, 5).length === 5);
+
+const base = [dAct(1), dAct(2, { temp: 15 }), dAct(3, { efforts: { "5k": 25 } })];
+const filled = applyDetails(base, { efforts: new Map([["strava:1", { "5k": 24 }], ["strava:2", { "5k": 23 }], ["strava:3", { "5k": 1 }]]), temps: new Map([["strava:1", 22], ["strava:2", 30], ["strava:3", null]]) });
+check("détails enregistrés sur l'activité lue", filled[0].temp === 22 && filled[0].efforts!["5k"] === 24);
+check("une température connue n'est jamais écrasée", filled[1].temp === 15 && filled[1].efforts!["5k"] === 23);
+check("des efforts connus non plus, et « pas de capteur » est mémorisé", filled[2].efforts!["5k"] === 25 && filled[2].temp === null);
+check("activité non lue : inchangée", applyDetails(base, { efforts: new Map(), temps: new Map() }).every((a, i) => a === base[i]));
 
 // ---------- Fusion ----------
 const m1 = mergeStrava(plan, empty, [], [run(100, s1.date, s1.km, 40)]);
