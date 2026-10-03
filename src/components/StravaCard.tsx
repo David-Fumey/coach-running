@@ -42,6 +42,9 @@ export default function StravaCard({ strava }: { strava: StravaApi }) {
               {busy ? "Synchronisation…" : "Synchroniser maintenant"}
             </button>
           </div>
+          <button type="button" className="link" disabled={busy} onClick={strava.syncAll}>
+            Importer tout l'historique de mon compte Strava
+          </button>
           <button
             type="button"
             className="link link--danger"

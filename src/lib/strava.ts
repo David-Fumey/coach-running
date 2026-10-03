@@ -1,7 +1,7 @@
 // Import des courses Strava (Garmin Connect se synchronise vers Strava). TypeScript pur : aucun appel réseau ici,
 // voir `stravaClient.ts` pour le réseau. La réponse de Strava n'est jamais crue sur parole.
 
-import { addDays, type Plan } from "./plan.ts";
+import { type Plan } from "./plan.ts";
 import { addActivity, type Activity, type Tracked } from "./activities.ts";
 
 export interface StravaTokens {
@@ -42,8 +42,6 @@ export const STRAVA_SOURCE = "strava";
 const RUN_TYPES = new Set(["Run", "TrailRun", "VirtualRun"]);
 /** Tolérance pour reconnaître une activité saisie à la main : même jour, distance à 10 % près. */
 const SAME_RUN_TOLERANCE = 0.1;
-/** Au premier import, on remonte un mois avant le début du plan. */
-const FIRST_SYNC_LOOKBACK_DAYS = 30;
 /** Pour les suivantes, on recouvre la période déjà vue (les doublons sont écartés). */
 const RESYNC_OVERLAP_DAYS = 7;
 
@@ -167,8 +165,10 @@ export function mergeStrava(plan: Plan, state: Tracked, seen: string[], runs: St
   return { state: current, seen: [...seenSet], added, matched };
 }
 
-/** Début de la fenêtre à demander à Strava, en secondes Unix. */
-export function syncAfter(plan: Plan, lastSync: number | null): number {
-  if (lastSync !== null) return Math.floor(lastSync / 1000) - RESYNC_OVERLAP_DAYS * 86400;
-  return Math.floor(Date.parse(`${addDays(plan.weeks[0].startDate, -FIRST_SYNC_LOOKBACK_DAYS)}T00:00:00Z`) / 1000);
+/**
+ * Début de la fenêtre à demander à Strava, en secondes Unix.
+ * Première synchro (ou historique complet demandé) : 0, donc toutes les courses du compte.
+ */
+export function syncAfter(lastSync: number | null): number {
+  return lastSync === null ? 0 : Math.floor(lastSync / 1000) - RESYNC_OVERLAP_DAYS * 86400;
 }

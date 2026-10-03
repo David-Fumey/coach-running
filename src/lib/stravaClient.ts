@@ -22,8 +22,8 @@ export class StravaError extends Error {
 const TOKEN_URL = "https://www.strava.com/oauth/token";
 const ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities";
 const PER_PAGE = 100;
-/** Garde-fou : 1 000 courses au maximum par synchronisation. */
-const MAX_PAGES = 10;
+/** Garde-fou : 3 000 activités au maximum par synchronisation. */
+const MAX_PAGES = 30;
 
 async function call(fetchFn: FetchLike, url: string, init?: Parameters<FetchLike>[1]) {
   let res;

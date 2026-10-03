@@ -20,6 +20,8 @@ export interface StravaApi {
   /** Oublie la connexion, l'identifiant et le secret (les activités déjà importées restent) */
   disconnect: () => void;
   sync: () => void;
+  /** Relit tout l'historique du compte Strava (les courses déjà connues sont ignorées) */
+  syncAll: () => void;
   /** À appeler quand les activités sont remplacées (nouveau plan, import) : tout redevient importable */
   forgetHistory: () => void;
   /** Efface tout, y compris l'historique d'import */
@@ -61,14 +63,14 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
   const syncing = useRef(false);
   const autoSynced = useRef(false);
 
-  const sync = useCallback(async () => {
+  const sync = useCallback(async (full = false) => {
     const { state: s, plan: p } = latest.current;
     if (syncing.current || !s.tokens) return;
     if (!p) return setStatus({ kind: "ok", text: "Connecté. Les courses seront importées dès que ton plan sera prêt." });
     syncing.current = true;
     setStatus({ kind: "syncing" });
     try {
-      const { tokens, runs } = await fetchRuns(s, s.tokens, syncAfter(p, s.lastSync), Math.floor(Date.now() / 1000), browserFetch);
+      const { tokens, runs } = await fetchRuns(s, s.tokens, full ? 0 : syncAfter(s.lastSync), Math.floor(Date.now() / 1000), browserFetch);
       const cur = latest.current;
       const merged = mergeStrava(cur.plan ?? p, { activities: cur.activities, done: cur.done }, cur.state.seen, runs);
       if (merged.added + merged.matched > 0) {
@@ -154,6 +156,7 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
       setStatus({ kind: "idle" });
     },
     sync: () => void sync(),
+    syncAll: () => void sync(true),
     forgetHistory: () => setState((prev) => ({ ...prev, seen: [], lastSync: null })),
     reset: () => {
       setState(EMPTY_STRAVA);

@@ -82,10 +82,9 @@ check("seules les courses sont importées", mixed.state.activities.length === 1)
 check("entrée non modifiée", empty.activities.length === 0 && Object.keys(empty.done).length === 0);
 
 // ---------- Fenêtre de synchro ----------
-const first = syncAfter(plan, null);
-check("première synchro : un mois avant le plan", first === Date.parse(`${plan.weeks[0].startDate}T00:00:00Z`) / 1000 - 30 * 86400, first);
+check("première synchro : tout l'historique", syncAfter(null) === 0);
 const last = Date.parse("2026-10-20T12:00:00Z");
-check("synchro suivante : recouvre la précédente", syncAfter(plan, last) === last / 1000 - 7 * 86400);
+check("synchro suivante : recouvre la précédente", syncAfter(last) === last / 1000 - 7 * 86400);
 
 // ---------- Connexion ----------
 const url = new URL(authorizeUrl("123", "http://localhost:5173/", "abc"));
