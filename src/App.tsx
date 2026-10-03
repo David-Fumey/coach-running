@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
+import type { Goal } from "./lib/goal";
 import { EMPTY_SNAPSHOT, makeBackup, parseBackup, type Snapshot } from "./lib/backup";
 import { addActivity, removeActivity, updateActivity, type Activity } from "./lib/activities";
 import { todayISO, useStoredState } from "./storage";
@@ -28,6 +29,8 @@ export default function App() {
   const [foods, setFoods] = useStoredState<Food[]>("foulee.foods.v1", []);
   // Allure moyenne d'entraînement saisie à la main ; null = calculée sur les sorties enregistrées.
   const [paceRef, setPaceRef] = useStoredState<number | null>("foulee.pace.v1", null);
+  // Temps objectif de course. Il appartient à une course : s'il ne correspond pas à celle du plan, il est ignoré.
+  const [goal, setGoal] = useStoredState<Goal | null>("foulee.goal.v1", null);
   const [editing, setEditing] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [tab, setTab] = useState<Tab>("accueil");
@@ -103,6 +106,7 @@ export default function App() {
     setProfile(d.profile);
     setFoods(d.foods);
     setPaceRef(d.paceRef);
+    setGoal(d.goal);
     setEditing(false);
     setTab("accueil");
     setPresetSession(undefined);
@@ -135,7 +139,8 @@ export default function App() {
   }
 
   const hubReady = !!plan && confirmed && !editing;
-  const paces = paceModel(activities, todayISO(), paceRef);
+  const planGoal = plan && goal && goal.race === plan.input.race ? goal : null;
+  const paces = paceModel(activities, todayISO(), paceRef, planGoal);
 
   if (showProfile) {
     return (
@@ -151,7 +156,7 @@ export default function App() {
             activityCount={activities.length}
             foodCount={foods.length}
             onSaveProfile={setProfile}
-            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef }, new Date())}
+            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal }, new Date())}
             onImport={importData}
             strava={strava}
             onReset={() => {
@@ -221,7 +226,7 @@ export default function App() {
           />
         )}
         {tab === "programme" && (
-          <PlanView plan={plan} done={done} onToggle={toggle} onEdit={() => setEditing(true)} paces={paces} paceRef={paceRef} onChangePaceRef={setPaceRef} />
+          <PlanView plan={plan} done={done} onToggle={toggle} onEdit={() => setEditing(true)} paces={paces} paceRef={paceRef} onChangePaceRef={setPaceRef} goal={planGoal} onChangeGoal={setGoal} />
         )}
         {tab === "activites" && (
           <Activities

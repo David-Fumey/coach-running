@@ -5,6 +5,8 @@ import { todayISO } from "../storage";
 import VolumeChart from "./VolumeChart";
 import { CheckIcon } from "./icons";
 import PaceCard, { PaceLine } from "./PaceCard";
+import GoalCard from "./GoalCard";
+import type { Goal } from "../lib/goal";
 import type { PaceModel } from "../lib/paces";
 
 interface Props {
@@ -16,6 +18,9 @@ interface Props {
   /** Allure moyenne saisie à la main, null si elle est calculée */
   paceRef: number | null;
   onChangePaceRef: (pace: number | null) => void;
+  /** Temps objectif de la course du plan */
+  goal: Goal | null;
+  onChangeGoal: (goal: Goal | null) => void;
 }
 
 /** Index de la semaine en cours (ou la plus proche si le plan n'a pas commencé ou est terminé). */
@@ -27,7 +32,7 @@ export function currentWeekIndex(plan: Plan, today: string) {
 }
 
 /** Onglet « Programme » : le plan complet, semaine par semaine. */
-export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef }: Props) {
+export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal }: Props) {
   const today = todayISO();
   const currentIndex = currentWeekIndex(plan, today);
 
@@ -42,6 +47,8 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
       )}
 
       <VolumeChart weeks={plan.weeks} currentIndex={currentIndex} doneIds={done} />
+
+      <GoalCard key={goal ? goal.minutes : "aucun"} race={plan.input.race} goal={goal} model={paces} onChange={onChangeGoal} />
 
       <PaceCard model={paces} manual={paceRef} onChangeManual={onChangePaceRef} />
 

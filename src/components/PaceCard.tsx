@@ -69,6 +69,7 @@ export default function PaceCard({ model, manual, onChangeManual }: Props) {
       <div className="pace-card__body">
         {ref ? (
           <p className="hint">
+            {ref.source === "objectif" && <>Calculées à partir de ton temps objectif, faute de sorties enregistrées. Dès que tu auras couru, elles s'appuieront sur tes sorties.</>}
             {ref.source === "manuelle" && <>Calculées à partir de l'allure moyenne que tu as saisie : {fmtPace(ref.pace)} /km.</>}
             {ref.source === "recentes" && (
               <>

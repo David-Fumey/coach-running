@@ -2709,3 +2709,69 @@ button {
   display: grid;
   gap: 0.625rem;
 }
+
+/* Objectif de course */
+
+.goal-card {
+  justify-items: stretch;
+}
+
+.goal-card__time {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-card__time small {
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.goal-card .hint {
+  margin: 0;
+}
+
+.goal-card__verdict {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.goal-card__verdict--realiste {
+  border-left-color: var(--done);
+}
+
+.goal-card__verdict--prudent {
+  border-left-color: var(--p-base);
+}
+
+.goal-card__verdict--ambitieux {
+  border-left-color: var(--accent);
+}
+
+.goal-card__verdict--tres-ambitieux {
+  border-left-color: var(--danger);
+}
+
+.goal-card__form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hero__goal {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero__goal strong {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+}

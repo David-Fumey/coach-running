@@ -44,7 +44,7 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
 
   return (
     <div className="home">
-      <PlanHero input={plan.input} />
+      <PlanHero input={plan.input} goal={paces?.goal ?? null} />
 
       <section className={`card next${next ? ` next--${next.type}` : ""}`} aria-labelledby="next-title">
         <p className="eyebrow">
