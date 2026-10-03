@@ -104,11 +104,32 @@ export function kindOf(type: Session["type"] | undefined, km: number): DayKind {
   }
 }
 
+export interface DayContext {
+  session?: Session;
+  km: number;
+  kind: DayKind;
+  /** Veille de course */
+  eve: boolean;
+}
+
 /**
- * Objectifs d'une journée.
+ * Nature d'une journée d'entraînement (indépendante du profil).
  * - Jour passé : distance réellement courue ; sans activité, la séance cochée compte pour sa distance prévue.
  * - Aujourd'hui et plus tard : distance prévue au plan, ou distance réelle si déjà courue.
  */
+export function dayContext(plan: Plan, activities: Activity[], done: Record<string, boolean>, date: string, today: string): DayContext {
+  const sessions = plan.weeks.flatMap((w) => w.sessions);
+  const session = sessions.find((s) => s.date === date);
+  const ran = activities.filter((a) => a.date === date).reduce((acc, a) => acc + a.km, 0);
+  const planned = session && (diffDays(today, date) >= 0 || done[session.id]) ? session.km : 0;
+  const km = ran > 0 ? ran : planned;
+  // Séance du plan non faite dans le passé : journée de repos.
+  const kind = kindOf(ran > 0 || planned > 0 ? session?.type : undefined, km);
+  const eve = sessions.find((s) => s.date === addDays(date, 1))?.type === "race";
+  return { session, km, kind, eve };
+}
+
+/** Objectifs nutritionnels d'une journée (voir `dayContext` pour la distance retenue). */
 export function dayTarget(
   plan: Plan,
   profile: Profile,
@@ -118,15 +139,7 @@ export function dayTarget(
   today: string,
   paceMinPerKm = 6
 ): DayTarget {
-  const session = plan.weeks.flatMap((w) => w.sessions).find((s) => s.date === date);
-  const ran = activities.filter((a) => a.date === date).reduce((acc, a) => acc + a.km, 0);
-  const planned = session && (diffDays(today, date) >= 0 || done[session.id]) ? session.km : 0;
-  const km = ran > 0 ? ran : planned;
-  // Séance du plan non faite dans le passé : journée de repos.
-  const kind = kindOf(ran > 0 || planned > 0 ? session?.type : undefined, km);
-
-  const nextDay = plan.weeks.flatMap((w) => w.sessions).find((s) => s.date === addDays(date, 1));
-  const eve = nextDay?.type === "race";
+  const { session, km, kind, eve } = dayContext(plan, activities, done, date, today);
 
   const w = profile.weightKg;
   const runKcal = km * w * RUN_KCAL_PER_KG_KM;
