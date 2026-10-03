@@ -1,6 +1,8 @@
-import { RACES, LEVELS, addDays, diffDays, parseISO, type Phase, type Plan, type Session, type Week } from "../lib/plan";
+import { addDays, diffDays, type Plan, type Session, type Week } from "../lib/plan";
+import { PHASE_LABEL, fmtDate, fmtKm } from "../lib/format";
 import { todayISO } from "../storage";
 import VolumeChart from "./VolumeChart";
+import { CheckIcon } from "./icons";
 
 interface Props {
   plan: Plan;
@@ -9,57 +11,21 @@ interface Props {
   onEdit: () => void;
 }
 
-const PHASE_LABEL: Record<Phase, string> = {
-  base: "Base",
-  construction: "Construction",
-  specifique: "Spécifique",
-  affutage: "Affûtage",
-  course: "Semaine de course",
-};
-
-const fmtKm = (x: number) => (Number.isInteger(x) ? `${x}` : x.toFixed(1).replace(".", ","));
-
-function fmtDate(iso: string, opts: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat("fr-FR", { ...opts, timeZone: "UTC" }).format(parseISO(iso));
+/** Index de la semaine en cours (ou la plus proche si le plan n'a pas commencé ou est terminé). */
+export function currentWeekIndex(plan: Plan, today: string) {
+  const { weeks } = plan;
+  const i = weeks.findIndex((w) => diffDays(w.startDate, today) >= 0 && diffDays(w.startDate, today) <= 6);
+  if (i >= 0) return i;
+  return diffDays(weeks[0].startDate, today) < 0 ? 0 : weeks.length - 1;
 }
 
+/** Onglet « Programme » : le plan complet, semaine par semaine. */
 export default function PlanView({ plan, done, onToggle, onEdit }: Props) {
   const today = todayISO();
-  const { input, weeks } = plan;
-  const race = RACES[input.race];
-
-  const currentIndex = (() => {
-    const i = weeks.findIndex((w) => diffDays(w.startDate, today) >= 0 && diffDays(w.startDate, today) <= 6);
-    if (i >= 0) return i;
-    return diffDays(weeks[0].startDate, today) < 0 ? 0 : weeks.length - 1;
-  })();
-
-  const allSessions = weeks.flatMap((w) => w.sessions);
-  const plannedKm = allSessions.reduce((acc, s) => acc + s.km, 0);
-  const doneKm = allSessions.filter((s) => done[s.id]).reduce((acc, s) => acc + s.km, 0);
-  const doneCount = allSessions.filter((s) => done[s.id]).length;
-  const daysLeft = diffDays(today, input.raceDate);
-  const pct = plannedKm > 0 ? Math.round((doneKm / plannedKm) * 100) : 0;
+  const currentIndex = currentWeekIndex(plan, today);
 
   return (
     <div className="plan">
-      <header className="hero">
-        <div>
-          <p className="hero__label">Objectif</p>
-          <h1 className="hero__race">{race.label}</h1>
-          <p className="hero__date">
-            {fmtDate(input.raceDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
-          <p className="hero__meta">
-            {LEVELS[input.level]}, {input.daysPerWeek} séances par semaine
-          </p>
-        </div>
-        <div className="hero__count" aria-label={daysLeft > 0 ? `${daysLeft} jours avant la course` : "Jour de course"}>
-          <span className="hero__days">{daysLeft > 0 ? daysLeft : 0}</span>
-          <span className="hero__unit">{daysLeft > 1 ? "jours" : "jour"}</span>
-        </div>
-      </header>
-
       {plan.warnings.length > 0 && (
         <ul className="warnings">
           {plan.warnings.map((w) => (
@@ -68,26 +34,16 @@ export default function PlanView({ plan, done, onToggle, onEdit }: Props) {
         </ul>
       )}
 
-      <section className="progress" aria-label="Progression">
-        <div className="progress__bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
-          <span style={{ width: `${pct}%` }} />
-        </div>
-        <p>
-          <strong>{fmtKm(Math.round(doneKm * 10) / 10)} km</strong> courus sur {fmtKm(Math.round(plannedKm))} km prévus.{" "}
-          {doneCount} séance{doneCount > 1 ? "s" : ""} sur {allSessions.length}.
-        </p>
-      </section>
-
-      <VolumeChart weeks={weeks} currentIndex={currentIndex} doneIds={done} />
+      <VolumeChart weeks={plan.weeks} currentIndex={currentIndex} doneIds={done} />
 
       <section className="weeks">
-        {weeks.map((w) => (
+        {plan.weeks.map((w) => (
           <WeekCard key={w.index} week={w} isCurrent={w.index === currentIndex} done={done} onToggle={onToggle} today={today} />
         ))}
       </section>
 
       <footer className="plan__footer">
-        <button type="button" className="btn" onClick={() => (window.confirm("Modifier l'objectif ? Les séances déjà validées seront effacées si tu recrées le plan.") ? onEdit() : undefined)}>
+        <button type="button" className="btn" onClick={() => (window.confirm("Modifier l'objectif ? Les séances déjà validées et les activités enregistrées seront effacées si tu recrées le plan.") ? onEdit() : undefined)}>
           Modifier l'objectif
         </button>
         <p className="hint">Tes données restent sur cet appareil, rien n'est envoyé en ligne.</p>
@@ -130,7 +86,7 @@ function WeekCard({ week, isCurrent, done, onToggle, today }: WeekProps) {
   );
 }
 
-function SessionRow({ session: s, isDone, isToday, onToggle }: { session: Session; isDone: boolean; isToday: boolean; onToggle: (id: string) => void }) {
+export function SessionRow({ session: s, isDone, isToday, onToggle }: { session: Session; isDone: boolean; isToday: boolean; onToggle: (id: string) => void }) {
   const day = fmtDate(s.date, { weekday: "short", day: "numeric", month: "short" });
   return (
     <li className={`session session--${s.type}${isDone ? " is-done" : ""}${isToday ? " is-today" : ""}`}>
@@ -141,7 +97,7 @@ function SessionRow({ session: s, isDone, isToday, onToggle }: { session: Sessio
         aria-label={`${isDone ? "Annuler" : "Valider"} la séance ${s.title} du ${day}`}
         onClick={() => onToggle(s.id)}
       >
-        {isDone ? "✓" : ""}
+        {isDone ? <CheckIcon /> : null}
       </button>
       <div className="session__main">
         <div className="session__head">

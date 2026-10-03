@@ -1,0 +1,217 @@
+import { useState, type FormEvent } from "react";
+import { diffDays, type Plan, type Session } from "../lib/plan";
+import { FEELINGS, byDateDesc, paceOf, parseMinutes, type Activity } from "../lib/activities";
+import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
+import { todayISO } from "../storage";
+
+interface Props {
+  plan: Plan;
+  done: Record<string, boolean>;
+  activities: Activity[];
+  /** Séance à pré-sélectionner (arrivée depuis l'accueil) */
+  presetSessionId?: string;
+  /** Sans id : création ; avec id : modification */
+  onSave: (a: Omit<Activity, "id">, id?: string) => void;
+  onDelete: (id: string) => void;
+}
+
+export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete }: Props) {
+  const today = todayISO();
+  const sessions = plan.weeks.flatMap((w) => w.sessions);
+  const byId = new Map(sessions.map((s) => [s.id, s]));
+  // Séances proposables : pas encore faites et au plus tard aujourd'hui (la présélection est toujours incluse).
+  const preset = presetSessionId ? byId.get(presetSessionId) : undefined;
+
+  const [showForm, setShowForm] = useState(!!preset);
+  /** Id de l'activité en cours de modification, undefined pour une création */
+  const [editingId, setEditingId] = useState<string | undefined>();
+  const [sessionId, setSessionId] = useState(preset?.id ?? "");
+  const [date, setDate] = useState(preset && preset.date <= today ? preset.date : today);
+  const [km, setKm] = useState(preset ? String(preset.km).replace(".", ",") : "");
+  const [time, setTime] = useState("");
+  const [feeling, setFeeling] = useState<Activity["feeling"]>(undefined);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+
+  // Séances proposables : pas encore faites et au plus tard aujourd'hui, plus la séance déjà liée ou présélectionnée.
+  const open = sessions.filter((s) => (!done[s.id] && diffDays(s.date, today) >= 0) || s.id === presetSessionId || s.id === sessionId);
+
+  function startEdit(a: Activity) {
+    setEditingId(a.id);
+    setSessionId(a.sessionId ?? "");
+    setDate(a.date);
+    setKm(String(a.km).replace(".", ","));
+    setTime(fmtTimeInput(a.minutes));
+    setFeeling(a.feeling);
+    setNote(a.note ?? "");
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0 });
+  }
+
+  function pickSession(id: string) {
+    setSessionId(id);
+    const s = byId.get(id);
+    if (s) {
+      setKm(String(s.km).replace(".", ","));
+      if (s.date <= today) setDate(s.date);
+    }
+  }
+
+  function reset() {
+    setShowForm(false);
+    setEditingId(undefined);
+    setSessionId("");
+    setDate(today);
+    setKm("");
+    setTime("");
+    setFeeling(undefined);
+    setNote("");
+    setError("");
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    const distance = Number(km.replace(",", "."));
+    const minutes = parseMinutes(time);
+    if (!date || date > today) return setError("Choisis une date qui n'est pas dans le futur.");
+    if (!Number.isFinite(distance) || distance <= 0 || distance > 250) return setError("Indique une distance en km (par exemple 8,5).");
+    if (minutes === null || minutes <= 0 || minutes > 24 * 60) return setError("Indique une durée, par exemple 45 (minutes) ou 1:05:30.");
+    onSave(
+      {
+        date,
+        km: Math.round(distance * 100) / 100,
+        minutes: Math.round(minutes * 100) / 100,
+        sessionId: sessionId || undefined,
+        feeling,
+        note: note.trim() || undefined,
+      },
+      editingId
+    );
+    reset();
+  }
+
+  const sorted = [...activities].sort(byDateDesc);
+
+  return (
+    <div className="activities">
+      {!showForm && (
+        <button type="button" className="btn btn--primary" onClick={() => setShowForm(true)}>
+          Enregistrer une activité
+        </button>
+      )}
+
+      {showForm && (
+        <form className="card form" onSubmit={handleSubmit} noValidate>
+          <h2 className="card__title">{editingId ? "Modifier l'activité" : "Nouvelle activité"}</h2>
+
+          <div className="field">
+            <label htmlFor="act-session">Séance du plan</label>
+            <select id="act-session" value={sessionId} onChange={(e) => pickSession(e.target.value)}>
+              <option value="">Sortie libre (hors plan)</option>
+              {open.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {sessionLabel(s)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="act-date">Date</label>
+            <input id="act-date" type="date" max={today} value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="act-km">Distance (km)</label>
+              <input id="act-km" type="text" inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="act-time">Durée</label>
+              <input id="act-time" type="text" inputMode="numeric" placeholder="45 ou 1:05:30" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
+          </div>
+
+          <fieldset className="field">
+            <legend>Ressenti (facultatif)</legend>
+            <div className="chips">
+              {([1, 2, 3, 4, 5] as const).map((n) => (
+                <label className="chip" key={n}>
+                  <input type="radio" name="feeling" checked={feeling === n} onChange={() => setFeeling(n)} />
+                  <span>{FEELINGS[n]}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="field">
+            <label htmlFor="act-note">Note (facultatif)</label>
+            <input id="act-note" type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="actions">
+            <button type="submit" className="btn btn--primary">
+              Enregistrer
+            </button>
+            <button type="button" className="btn" onClick={reset}>
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
+
+      {sorted.length === 0 ? (
+        <p className="hint empty">Aucune activité pour l'instant. Enregistre ta première sortie pour alimenter tes statistiques.</p>
+      ) : (
+        <ul className="activity-list">
+          {sorted.map((a) => {
+            const s = a.sessionId ? byId.get(a.sessionId) : undefined;
+            return (
+              <li key={a.id} className="activity">
+                <div className="activity__head">
+                  <span className="session__date">{fmtDate(a.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
+                  <span className="activity__km">{fmtKm(a.km)} km</span>
+                </div>
+                <p className="activity__meta">
+                  {s ? s.title : "Sortie libre"} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
+                  {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
+                </p>
+                {a.note && <p className="hint">{a.note}</p>}
+                <button type="button" className="link" onClick={() => startEdit(a)}>
+                  Modifier
+                </button>{" "}
+                <button
+                  type="button"
+                  className="link link--danger"
+                  onClick={() => window.confirm("Supprimer cette activité ?") && onDelete(a.id)}
+                >
+                  Supprimer
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Minutes décimales → saisie relisible par parseMinutes (« 38:30 » ou « 1:05:30 »). */
+function fmtTimeInput(minutes: number) {
+  const total = Math.round(minutes * 60);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+}
+
+function sessionLabel(s: Session) {
+  return `${fmtDate(s.date, { weekday: "short", day: "numeric", month: "short" })} · ${s.title} · ${fmtKm(s.km)} km`;
+}
