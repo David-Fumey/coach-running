@@ -51,6 +51,7 @@ export default function SetupForm({ initial, onSubmit, onCancel }: Props) {
   return (
     <form className="setup" onSubmit={handleSubmit} noValidate>
       <header className="setup__intro">
+        <img className="brand__mark" src="./icon.svg" alt="" width="56" height="56" />
         <h1 className="brand">Foulée</h1>
         <p className="lead">
           Dis-nous quelle course tu prépares. On construit ton plan semaine par semaine, jusqu'au jour J.
