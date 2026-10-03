@@ -3134,3 +3134,51 @@ button {
   flex: none;
   white-space: nowrap;
 }
+
+/* Ma transpiration */
+
+.sweat {
+  justify-items: stretch;
+}
+
+.sweat .hint,
+.sweat .notice {
+  margin: 0;
+}
+
+.sweat__how summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sweat__how[open] summary {
+  margin-bottom: 0.5rem;
+}
+
+.sweat__form {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.sweat__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sweat__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.625rem 0;
+  border-top: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+.sweat__list small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}

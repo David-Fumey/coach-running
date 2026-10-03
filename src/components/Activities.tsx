@@ -210,6 +210,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                   {s ? s.title : "Sortie libre"}{a.source === "strava" ? " · Strava" : ""} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
                   {a.avgHr ? ` · FC ${a.avgHr} bpm` : ""}
                   {a.elevation ? ` · D+ ${a.elevation} m` : ""}
+                  {typeof a.temp === "number" ? ` · ${Math.round(a.temp)} °C` : ""}
                   {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
                 </p>
                 {s && <PaceCheck plan={plan} model={paces} session={s} pace={paceOf(a)} />}

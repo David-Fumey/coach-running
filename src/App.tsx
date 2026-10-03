@@ -3,7 +3,7 @@ import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
 import { canUndoShift, shiftPlan } from "./lib/shift";
-import type { Water } from "./lib/hydration";
+import type { Water, Weighing } from "./lib/hydration";
 import { EMPTY_SNAPSHOT, makeBackup, parseBackup, type Snapshot } from "./lib/backup";
 import { addActivity, removeActivity, updateActivity, type Activity } from "./lib/activities";
 import { todayISO, useStoredState } from "./storage";
@@ -30,6 +30,7 @@ export default function App() {
   const [profile, setProfile] = useStoredState<Profile | null>("foulee.profile.v1", null);
   const [foods, setFoods] = useStoredState<Food[]>("foulee.foods.v1", []);
   const [water, setWater] = useStoredState<Water[]>("foulee.water.v1", []);
+  const [sweat, setSweat] = useStoredState<Weighing[]>("foulee.sweat.v1", []);
   // Allure moyenne d'entraînement saisie à la main ; null = calculée sur les sorties enregistrées.
   const [paceRef, setPaceRef] = useStoredState<number | null>("foulee.pace.v1", null);
   // Temps objectif de course. Il appartient à une course : s'il ne correspond pas à celle du plan, il est ignoré.
@@ -85,6 +86,7 @@ export default function App() {
       ...(origin?.maxHr !== undefined ? { maxHr: origin.maxHr } : {}),
       ...(origin?.elevation !== undefined ? { elevation: origin.elevation } : {}),
       ...(origin?.efforts !== undefined ? { efforts: origin.efforts } : {}),
+      ...(origin?.temp !== undefined ? { temp: origin.temp } : {}),
     };
     const next = id ? updateActivity({ activities, done }, activity) : addActivity({ activities, done }, activity);
     setActivities(next.activities);
@@ -124,6 +126,11 @@ export default function App() {
     setWater((prev) => [...prev, { id, date, ml }]);
   }
 
+  function addWeighing(w: Omit<Weighing, "id">) {
+    const id = `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    setSweat((prev) => [...prev, { ...w, id }]);
+  }
+
   function applySnapshot(d: Snapshot) {
     setPlan(d.plan);
     setPlanBeforeShift(null);
@@ -134,6 +141,7 @@ export default function App() {
     setProfile(d.profile);
     setFoods(d.foods);
     setWater(d.water);
+    setSweat(d.sweat);
     setPaceRef(d.paceRef);
     setGoal(d.goal);
     setEditing(false);
@@ -185,7 +193,7 @@ export default function App() {
             activityCount={activities.length}
             foodCount={foods.length}
             onSaveProfile={setProfile}
-            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water }, new Date())}
+            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water, sweat }, new Date())}
             onImport={importData}
             strava={strava}
             onReset={() => {
@@ -290,6 +298,9 @@ export default function App() {
             water={water}
             onAddWater={addWater}
             onDeleteWater={(id) => setWater((prev) => prev.filter((w) => w.id !== id))}
+            sweat={sweat}
+            onAddWeighing={addWeighing}
+            onDeleteWeighing={(id) => setSweat((prev) => prev.filter((w) => w.id !== id))}
           />
         )}
       </main>

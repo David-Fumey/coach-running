@@ -5,9 +5,9 @@ import {
   EFFORT_CANDIDATES_PER_DISTANCE,
   EMPTY_STRAVA,
   STRAVA_SCHEMA,
-  applyEfforts,
+  applyDetails,
   authorizeUrl,
-  effortCandidates,
+  detailTargets,
   isConnected,
   mergeStrava,
   parseCallback,
@@ -100,30 +100,31 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
       // Une lecture complète a couvert tout l'historique : les détails (cœur, dénivelé) sont à jour.
       const complete = full || s.lastSync === null;
       setState((prev) => ({ ...prev, tokens, lastSync: Date.now(), seen: merged.seen, ...(complete ? { schema: STRAVA_SCHEMA } : {}) }));
-      // Meilleurs efforts : lecture du détail des sorties les plus rapides, quelques requêtes par synchronisation.
+      // Détails des sorties (température, meilleurs efforts) : quelques requêtes par synchronisation.
       let effortNote = "";
-      const todo = effortCandidates(merged.state.activities);
+      const todo = detailTargets(merged.state.activities);
       if (todo.length > 0) {
-        setStatus({ kind: "syncing", text: `Meilleurs efforts : 0/${todo.length}…` });
+        setStatus({ kind: "syncing", text: `Détails des sorties : 0/${todo.length}…` });
         const res = await fetchEfforts(
           tokens.accessToken,
           todo.map((a) => stravaNumericId(a)!),
           browserFetch,
-          (n, total) => setStatus({ kind: "syncing", text: `Meilleurs efforts : ${n}/${total}…` })
+          (n, total) => setStatus({ kind: "syncing", text: `Détails des sorties : ${n}/${total}…` })
         );
         let activitiesNow = merged.state.activities;
         if (res.efforts.size > 0) {
-          const byExternalId = new Map([...res.efforts].map(([id, e]) => [`strava:${id}`, e]));
+          const efforts = new Map([...res.efforts].map(([id, e]) => [`strava:${id}`, e]));
+          const temps = new Map([...res.temps].map(([id, t]) => [`strava:${id}`, t]));
           // Le rendu de la fusion peut ne pas avoir eu lieu : on ne part des activités courantes que si elles la contiennent.
           const live = latest.current.activities;
           const base = merged.state.activities.every((a) => live.some((x) => x.id === a.id)) ? live : merged.state.activities;
-          activitiesNow = applyEfforts(base, byExternalId);
+          activitiesNow = applyDetails(base, { efforts, temps });
           setActivities(activitiesNow);
         }
-        const remaining = effortCandidates(activitiesNow, EFFORT_CANDIDATES_PER_DISTANCE, Infinity).length;
+        const remaining = detailTargets(activitiesNow, EFFORT_CANDIDATES_PER_DISTANCE, Infinity).length;
         const analysed = res.efforts.size;
         const parts: string[] = [];
-        if (analysed > 0) parts.push(analysed === 1 ? "1 sortie analysée pour les meilleurs efforts" : `${analysed} sorties analysées pour les meilleurs efforts`);
+        if (analysed > 0) parts.push(analysed === 1 ? "1 sortie analysée (température, meilleurs efforts)" : `${analysed} sorties analysées (température, meilleurs efforts)`);
         if (res.stopped?.kind === "quota") parts.push("quota Strava atteint, la suite sera lue à la prochaine synchro");
         else if (res.stopped) parts.push(res.stopped.message);
         else if (remaining > 0) parts.push(`${remaining} à analyser : relance la synchro`);

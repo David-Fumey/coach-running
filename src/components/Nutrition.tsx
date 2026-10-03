@@ -17,7 +17,7 @@ import { todayISO } from "../storage";
 import Advice from "./Advice";
 import Recipes from "./Recipes";
 import Hydration from "./Hydration";
-import type { Water } from "../lib/hydration";
+import type { Water, Weighing } from "../lib/hydration";
 import ProfileForm from "./ProfileForm";
 import { Ring } from "./icons";
 
@@ -34,6 +34,9 @@ interface Props {
   water: Water[];
   onAddWater: (date: string, ml: number) => void;
   onDeleteWater: (id: string) => void;
+  sweat: Weighing[];
+  onAddWeighing: (w: Omit<Weighing, "id">) => void;
+  onDeleteWeighing: (id: string) => void;
 }
 
 const KIND_SHORT: Record<DayKind, string> = { repos: "Repos", facile: "Facile", intense: "Intense", long: "Long", course: "Course" };
@@ -70,6 +73,9 @@ export default function Nutrition(props: Props) {
           onAdd={props.onAddWater}
           onDelete={props.onDeleteWater}
           onOpenProfile={props.onOpenProfile}
+          sweat={props.sweat}
+          onAddWeighing={props.onAddWeighing}
+          onDeleteWeighing={props.onDeleteWeighing}
         />
       )}
       {view === "recettes" && (
