@@ -57,7 +57,9 @@ function validActivity(a: unknown): a is Activity {
     isNum(a.minutes) && a.minutes > 0 &&
     (a.sessionId === undefined || typeof a.sessionId === "string") &&
     (a.feeling === undefined || (isNum(a.feeling) && a.feeling >= 1 && a.feeling <= 5)) &&
-    (a.note === undefined || typeof a.note === "string")
+    (a.note === undefined || typeof a.note === "string") &&
+    (a.source === undefined || typeof a.source === "string") &&
+    (a.externalId === undefined || typeof a.externalId === "string")
   );
 }
 

@@ -12,7 +12,8 @@
     "test:nutrition": "node --experimental-strip-types scripts/check-nutrition.ts",
     "test:backup": "node --experimental-strip-types scripts/check-backup.ts",
     "test:advice": "node --experimental-strip-types scripts/check-advice.ts",
-    "test:recipes": "node --experimental-strip-types scripts/check-recipes.ts"
+    "test:recipes": "node --experimental-strip-types scripts/check-recipes.ts",
+    "test:strava": "node --experimental-strip-types scripts/check-strava.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",

@@ -13,6 +13,10 @@ export interface Activity {
   /** Ressenti de 1 (très dur) à 5 (excellent) */
   feeling?: 1 | 2 | 3 | 4 | 5;
   note?: string;
+  /** Origine d'une activité importée ('strava') ; absent pour une saisie à la main */
+  source?: string;
+  /** Identifiant dans le service d'origine, pour ne jamais importer deux fois la même sortie */
+  externalId?: string;
 }
 
 export const FEELINGS: Record<number, string> = {
