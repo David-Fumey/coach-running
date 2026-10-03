@@ -2517,3 +2517,57 @@ button {
   color: var(--muted);
   font-weight: 400;
 }
+
+/* Records repliables */
+
+.records-fold {
+  display: block;
+  padding: 0;
+}
+
+.records-fold summary {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  padding: 1rem 2.75rem 1rem 1.125rem;
+  border-radius: var(--r);
+  cursor: pointer;
+  list-style: none;
+}
+
+.records-fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.records-fold summary::after {
+  content: "";
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.2s;
+}
+
+.records-fold[open] summary::after {
+  transform: translateY(-30%) rotate(-135deg);
+}
+
+.records-fold__preview {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-fold[open] .records-fold__preview {
+  display: none;
+}
+
+.records-fold__body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0 1.125rem 1.125rem;
+}
