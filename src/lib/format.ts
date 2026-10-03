@@ -28,3 +28,13 @@ export function fmtPace(minPerKm: number) {
   const total = Math.round(minPerKm * 60);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
+
+/** Temps de course : 24.75 → « 24:45 », 105.5 → « 1:45:30 ». */
+export function fmtClock(minutes: number) {
+  const total = Math.round(minutes * 60);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+}

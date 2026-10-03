@@ -2448,3 +2448,72 @@ button {
 .legend__swatch--elev {
   background: linear-gradient(var(--p-specifique), color-mix(in srgb, var(--p-specifique) 40%, transparent));
 }
+
+/* Records */
+
+.records-card {
+  justify-items: stretch;
+  gap: 0.75rem;
+}
+
+.records__scope {
+  margin: 0;
+}
+
+.records {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.record:first-child {
+  border-top: 0;
+}
+
+.record__main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.record__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.record__value {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.record__value abbr {
+  text-decoration: none;
+  color: var(--muted);
+  cursor: help;
+}
+
+.record__meta {
+  margin: 0.125rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.record--empty .record__label,
+.record--empty .record__value {
+  color: var(--muted);
+  font-weight: 400;
+}

@@ -17,6 +17,7 @@ import {
 } from "../lib/progress";
 import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 import { todayISO } from "../storage";
+import Records from "./Records";
 import { TrendChart, VolumeChart, periodLabel, type TrendMetric, type VolumeMetric } from "./charts";
 
 interface Props {
@@ -130,6 +131,12 @@ export default function Progress({ plan, done, activities }: Props) {
         {extras.elevation !== null && <Stat label="Dénivelé" value={Math.round(extras.elevation).toLocaleString("fr-FR")} unit="m" />}
         {extras.hr !== null && <Stat label="FC moy." value={String(Math.round(extras.hr))} unit="bpm" />}
       </dl>
+
+      <Records
+        activities={scoped}
+        today={today}
+        scopeLabel={scope === "programme" ? "Sur les activités du programme actuel." : "Sur toutes les activités enregistrées."}
+      />
 
       {view.length === 0 ? (
         <p className="hint empty">Aucune activité à afficher.</p>
