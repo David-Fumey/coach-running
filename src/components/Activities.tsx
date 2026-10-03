@@ -5,6 +5,8 @@ import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 import { todayISO } from "../storage";
 import type { StravaApi } from "../useStrava";
 import { fmtSync } from "./StravaCard";
+import { PaceCheck } from "./PaceCard";
+import type { PaceModel } from "../lib/paces";
 
 interface Props {
   plan: Plan;
@@ -17,9 +19,10 @@ interface Props {
   onDelete: (id: string) => void;
   strava: StravaApi;
   onOpenProfile: () => void;
+  paces: PaceModel | null;
 }
 
-export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete, strava, onOpenProfile }: Props) {
+export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete, strava, onOpenProfile, paces }: Props) {
   const today = todayISO();
   const sessions = plan.weeks.flatMap((w) => w.sessions);
   const byId = new Map(sessions.map((s) => [s.id, s]));
@@ -209,6 +212,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                   {a.elevation ? ` · D+ ${a.elevation} m` : ""}
                   {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
                 </p>
+                {s && <PaceCheck plan={plan} model={paces} session={s} pace={paceOf(a)} />}
                 {a.note && <p className="hint">{a.note}</p>}
                 <button type="button" className="link" onClick={() => startEdit(a)}>
                   Modifier

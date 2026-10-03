@@ -1,14 +1,21 @@
+import type { ReactNode } from "react";
 import { addDays, diffDays, type Plan, type Session, type Week } from "../lib/plan";
 import { PHASE_LABEL, fmtDate, fmtKm } from "../lib/format";
 import { todayISO } from "../storage";
 import VolumeChart from "./VolumeChart";
 import { CheckIcon } from "./icons";
+import PaceCard, { PaceLine } from "./PaceCard";
+import type { PaceModel } from "../lib/paces";
 
 interface Props {
   plan: Plan;
   done: Record<string, boolean>;
   onToggle: (id: string) => void;
   onEdit: () => void;
+  paces: PaceModel | null;
+  /** Allure moyenne saisie à la main, null si elle est calculée */
+  paceRef: number | null;
+  onChangePaceRef: (pace: number | null) => void;
 }
 
 /** Index de la semaine en cours (ou la plus proche si le plan n'a pas commencé ou est terminé). */
@@ -20,7 +27,7 @@ export function currentWeekIndex(plan: Plan, today: string) {
 }
 
 /** Onglet « Programme » : le plan complet, semaine par semaine. */
-export default function PlanView({ plan, done, onToggle, onEdit }: Props) {
+export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef }: Props) {
   const today = todayISO();
   const currentIndex = currentWeekIndex(plan, today);
 
@@ -36,9 +43,11 @@ export default function PlanView({ plan, done, onToggle, onEdit }: Props) {
 
       <VolumeChart weeks={plan.weeks} currentIndex={currentIndex} doneIds={done} />
 
+      <PaceCard model={paces} manual={paceRef} onChangeManual={onChangePaceRef} />
+
       <section className="weeks">
         {plan.weeks.map((w) => (
-          <WeekCard key={w.index} week={w} isCurrent={w.index === currentIndex} done={done} onToggle={onToggle} today={today} />
+          <WeekCard key={w.index} plan={plan} paces={paces} week={w} isCurrent={w.index === currentIndex} done={done} onToggle={onToggle} today={today} />
         ))}
       </section>
 
@@ -53,6 +62,8 @@ export default function PlanView({ plan, done, onToggle, onEdit }: Props) {
 }
 
 interface WeekProps {
+  plan: Plan;
+  paces: PaceModel | null;
   week: Week;
   isCurrent: boolean;
   done: Record<string, boolean>;
@@ -60,7 +71,7 @@ interface WeekProps {
   today: string;
 }
 
-function WeekCard({ week, isCurrent, done, onToggle, today }: WeekProps) {
+function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekProps) {
   const doneCount = week.sessions.filter((s) => done[s.id]).length;
   const end = addDays(week.startDate, 6);
   const range = `${fmtDate(week.startDate, { day: "numeric", month: "short" })} au ${fmtDate(end, { day: "numeric", month: "short" })}`;
@@ -79,14 +90,14 @@ function WeekCard({ week, isCurrent, done, onToggle, today }: WeekProps) {
       <p className="week__focus">{week.focus}</p>
       <ul className="sessions">
         {week.sessions.map((s) => (
-          <SessionRow key={s.id} session={s} isDone={!!done[s.id]} isToday={s.date === today} onToggle={onToggle} />
+          <SessionRow key={s.id} session={s} isDone={!!done[s.id]} isToday={s.date === today} onToggle={onToggle} pace={<PaceLine plan={plan} model={paces} session={s} />} />
         ))}
       </ul>
     </details>
   );
 }
 
-export function SessionRow({ session: s, isDone, isToday, onToggle }: { session: Session; isDone: boolean; isToday: boolean; onToggle: (id: string) => void }) {
+export function SessionRow({ session: s, isDone, isToday, onToggle, pace }: { session: Session; isDone: boolean; isToday: boolean; onToggle: (id: string) => void; pace?: ReactNode }) {
   const day = fmtDate(s.date, { weekday: "short", day: "numeric", month: "short" });
   return (
     <li className={`session session--${s.type}${isDone ? " is-done" : ""}${isToday ? " is-today" : ""}`}>
@@ -106,6 +117,7 @@ export function SessionRow({ session: s, isDone, isToday, onToggle }: { session:
           <span className="session__km">{fmtKm(s.km)} km</span>
         </div>
         <p className="session__details">{s.details}</p>
+        {pace}
       </div>
     </li>
   );

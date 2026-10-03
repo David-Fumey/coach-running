@@ -2571,3 +2571,141 @@ button {
   gap: 0.75rem;
   padding: 0 1.125rem 1.125rem;
 }
+
+/* Allures cibles */
+
+.session__pace {
+  margin: 0.375rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.session__pace strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.session__pace-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.activity__pace {
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity__pace--dans {
+  color: var(--done);
+}
+
+.activity__pace--rapide,
+.activity__pace--lent {
+  color: var(--muted);
+}
+
+.pace-card {
+  display: block;
+  justify-items: stretch;
+  padding: 0;
+}
+
+.pace-card summary {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  padding: 1rem 2.75rem 1rem 1.125rem;
+  border-radius: var(--r);
+  cursor: pointer;
+  list-style: none;
+}
+
+.pace-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.pace-card summary::after {
+  content: "";
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.2s;
+}
+
+.pace-card[open] summary::after {
+  transform: translateY(-30%) rotate(-135deg);
+}
+
+.pace-card__preview {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-card[open] .pace-card__preview {
+  display: none;
+}
+
+.pace-card__body {
+  display: grid;
+  gap: 0.875rem;
+  padding: 0 1.125rem 1.125rem;
+}
+
+.pace-card__body .hint {
+  margin: 0;
+}
+
+.pace-table {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pace-table li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.pace-table li:first-child {
+  border-top: 0;
+}
+
+.pace-table__zone {
+  display: grid;
+  font-weight: 600;
+}
+
+.pace-table__zone small {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.pace-table__range {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-card__form {
+  display: grid;
+  gap: 0.625rem;
+}

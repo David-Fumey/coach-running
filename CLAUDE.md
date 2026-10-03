@@ -9,11 +9,12 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 3. Partie « Conseils » selon les apports recherchés (v0.4 : fiches par apport et conseils par phase, fait) et recettes conseillées selon des critères (v0.5, fait).
 4. Import automatique des sorties de la montre Garmin via Strava (v0.6 : fait, à essayer avec un vrai compte).
 5. Écran Progrès filtrable : programme actuel ou total, graphiques par semaine, mois ou année (v0.7, fait), avec records personnels (v0.8, fait).
+6. Allures cibles par séance, déduites de la moyenne des sorties enregistrées (v0.9, fait).
 
 ## Stack
 
 - Vite + React 19 + TypeScript, sans backend.
-- Données dans le `localStorage` (clés `foulee.plan.v1`, `foulee.done.v1`, `foulee.activities.v1`, `foulee.confirmed.v1`, `foulee.profile.v1`, `foulee.foods.v1`, plus `foulee.strava.v1` pour la connexion Strava). Une sauvegarde des données se télécharge et se réimporte en JSON depuis la page Profil (`src/lib/backup.ts`) ; elle n'inclut jamais la clé `foulee.strava.v1` (identifiant, secret et jetons Strava).
+- Données dans le `localStorage` (clés `foulee.plan.v1`, `foulee.done.v1`, `foulee.activities.v1`, `foulee.confirmed.v1`, `foulee.profile.v1`, `foulee.foods.v1`, `foulee.pace.v1` pour l'allure moyenne saisie à la main, plus `foulee.strava.v1` pour la connexion Strava). Une sauvegarde des données se télécharge et se réimporte en JSON depuis la page Profil (`src/lib/backup.ts`) ; elle n'inclut jamais la clé `foulee.strava.v1` (identifiant, secret et jetons Strava).
 - Polices (Barlow Condensed, Source Sans 3) embarquées via `@fontsource` : aucune requête vers un service tiers, hors ligne compris. Le style est dans `src/styles.css` (jetons en tête de fichier, thèmes clair et sombre automatiques).
 - Parcours : formulaire → relecture du plan → validation → hub à onglets (Accueil, Programme, Activités, Progrès, Nutrition).
 - PWA : `public/manifest.webmanifest` et `public/sw.js`.
@@ -34,6 +35,7 @@ npm run test:advice      # vérifie les fiches de conseils et leur personnalisat
 npm run test:recipes     # vérifie les recettes, les régimes calculés et les filtres
 npm run test:progress    # vérifie le regroupement par semaine, mois, année et les portées
 npm run test:records     # vérifie les records personnels (distances, séries, repères)
+npm run test:paces       # vérifie les allures cibles déduites des sorties
 npm run test:strava      # vérifie l'import Strava (conversion, fusion sans doublon, client réseau simulé)
 ```
 
@@ -41,7 +43,7 @@ npm run test:strava      # vérifie l'import Strava (conversion, fusion sans dou
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts` ou `records.ts` doit garder les neuf scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts` ou `paces.ts` doit garder les dix scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 

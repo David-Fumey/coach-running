@@ -5,6 +5,8 @@ import { todayISO } from "../storage";
 import PlanHero from "./PlanHero";
 import { CheckIcon, ChevronIcon, Ring } from "./icons";
 import { currentWeekIndex } from "./PlanView";
+import { PaceLine } from "./PaceCard";
+import type { PaceModel } from "../lib/paces";
 
 interface Props {
   plan: Plan;
@@ -13,6 +15,7 @@ interface Props {
   onLog: (sessionId?: string) => void;
   onOpenProgram: () => void;
   onOpenProgress: () => void;
+  paces: PaceModel | null;
 }
 
 const TYPE_LABEL: Record<Session["type"], string> = {
@@ -28,7 +31,7 @@ const TYPE_LABEL: Record<Session["type"], string> = {
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 /** Accueil du hub : la prochaine séance, la semaine en cours et quelques chiffres. */
-export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress }: Props) {
+export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, paces }: Props) {
   const today = todayISO();
   const week = plan.weeks[currentWeekIndex(plan, today)];
   const allSessions = plan.weeks.flatMap((w) => w.sessions);
@@ -63,6 +66,7 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
               </p>
             </div>
             <p className="session__details">{next.details}</p>
+            <PaceLine plan={plan} model={paces} session={next} />
             <div className="actions">
               <button type="button" className="btn btn--primary" onClick={() => onLog(next.id)}>
                 Enregistrer cette séance
