@@ -22,6 +22,7 @@ const full: Snapshot = {
   confirmed: true,
   profile: { name: "Alex", sex: "f", age: 31, weightKg: 58.5, heightCm: 168, goal: "maintenir" },
   foods: [{ id: "f1", date: "2026-10-05", label: "Riz", kcal: 300, carbs: 60 }],
+  paceRef: 6.25,
 };
 const text = makeBackup(full, new Date("2026-10-05T10:00:00Z"));
 
@@ -52,6 +53,11 @@ check("plan invalide", err(mutate((o) => (o.data.plan.weeks = "x"))) !== null &&
 check("activité invalide", err(mutate((o) => (o.data.activities[0].km = -2))) !== null && err(mutate((o) => (o.data.activities[0].date = "hier"))) !== null && err(mutate((o) => (o.data.activities[0].feeling = 9))) !== null);
 check("aliment invalide", err(mutate((o) => (o.data.foods[0].kcal = "beaucoup"))) !== null && err(mutate((o) => (o.data.foods[0].carbs = -1))) !== null);
 check("profil invalide", err(mutate((o) => (o.data.profile.weightKg = 5))) !== null && err(mutate((o) => (o.data.profile.goal = "x"))) !== null && err(mutate((o) => (o.data.profile.sex = "z"))) !== null);
+check("allure moyenne invalide", err(mutate((o) => (o.data.paceRef = 1))) !== null && err(mutate((o) => (o.data.paceRef = "6:00"))) !== null && err(mutate((o) => (o.data.paceRef = 40))) !== null);
+check("allure moyenne absente : null", (() => {
+  const r = parseBackup(mutate((o) => delete o.data.paceRef));
+  return r.ok && r.data.paceRef === null;
+})());
 check("séances validées invalides", err(mutate((o) => (o.data.done = { x: "oui" }))) !== null);
 check("sans plan, jamais confirmé", (() => {
   const r = parseBackup(mutate((o) => ((o.data.plan = null), (o.data.confirmed = true))));

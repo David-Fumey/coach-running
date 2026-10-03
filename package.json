@@ -15,7 +15,8 @@
     "test:recipes": "node --experimental-strip-types scripts/check-recipes.ts",
     "test:strava": "node --experimental-strip-types scripts/check-strava.ts",
     "test:progress": "node --experimental-strip-types scripts/check-progress.ts",
-    "test:records": "node --experimental-strip-types scripts/check-records.ts"
+    "test:records": "node --experimental-strip-types scripts/check-records.ts",
+    "test:paces": "node --experimental-strip-types scripts/check-paces.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",
