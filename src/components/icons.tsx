@@ -101,3 +101,9 @@ export function Ring({ value, goal, label, sub, size = 96 }: { value: number; go
     </div>
   );
 }
+
+export const DropIcon = () => (
+  <Svg>
+    <path d="M12 3.5c3.2 3.8 5.5 6.6 5.5 9.7a5.5 5.5 0 0 1-11 0c0-3.1 2.3-5.9 5.5-9.7Z" />
+  </Svg>
+);

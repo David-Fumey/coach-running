@@ -3182,3 +3182,58 @@ button {
   color: var(--muted);
   font-size: 0.8125rem;
 }
+
+/* Rappel d'hydratation après une sortie */
+
+.loss-banner {
+  display: flex;
+  gap: 0.875rem;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--p-construction);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.loss-banner__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--p-construction) 15%, transparent);
+  color: var(--p-construction);
+}
+
+.loss-banner__text {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.loss-banner__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.loss-banner__detail {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.loss-banner__detail strong {
+  color: var(--ink);
+}
+
+.loss-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}

@@ -3,7 +3,9 @@ import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
 import { canUndoShift, shiftPlan } from "./lib/shift";
-import type { Water, Weighing } from "./lib/hydration";
+import { DEFAULT_WEIGHT_KG, calibration, postRunLoss, type Water, type Weighing } from "./lib/hydration";
+import LossBanner from "./components/LossBanner";
+import type { View as NutritionView } from "./components/Nutrition";
 import { EMPTY_SNAPSHOT, makeBackup, parseBackup, type Snapshot } from "./lib/backup";
 import { addActivity, removeActivity, updateActivity, type Activity } from "./lib/activities";
 import { todayISO, useStoredState } from "./storage";
@@ -31,6 +33,10 @@ export default function App() {
   const [foods, setFoods] = useStoredState<Food[]>("foulee.foods.v1", []);
   const [water, setWater] = useStoredState<Water[]>("foulee.water.v1", []);
   const [sweat, setSweat] = useStoredState<Weighing[]>("foulee.sweat.v1", []);
+  // Sorties dont le rappel d'hydratation a été fermé. Simple confort d'affichage : hors sauvegarde.
+  const [lossSeen, setLossSeen] = useStoredState<string[]>("foulee.lossseen.v1", []);
+  /** Volet de Nutrition à ouvrir (depuis le rappel d'hydratation) */
+  const [nutritionStart, setNutritionStart] = useState<NutritionView | undefined>();
   // Allure moyenne d'entraînement saisie à la main ; null = calculée sur les sorties enregistrées.
   const [paceRef, setPaceRef] = useStoredState<number | null>("foulee.pace.v1", null);
   // Temps objectif de course. Il appartient à une course : s'il ne correspond pas à celle du plan, il est ignoré.
@@ -163,9 +169,22 @@ export default function App() {
   }
 
   function goTo(next: Tab) {
+    setNutritionStart(undefined);
     setShowProfile(false);
     setPresetSession(undefined);
     setTab(next);
+    window.scrollTo({ top: 0 });
+  }
+
+  function dismissLoss(id: string) {
+    setLossSeen((prev) => [...prev.filter((x) => x !== id), id].slice(-50));
+  }
+
+  function openHydration(id: string) {
+    dismissLoss(id);
+    setNutritionStart("hydratation");
+    setShowProfile(false);
+    setTab("nutrition");
     window.scrollTo({ top: 0 });
   }
 
@@ -176,6 +195,9 @@ export default function App() {
   }
 
   const hubReady = !!plan && confirmed && !editing;
+  const postRun = hubReady
+    ? postRunLoss(activities, sweat, lossSeen, todayISO(), profile?.weightKg ?? DEFAULT_WEIGHT_KG, calibration(sweat)?.factor ?? 1)
+    : null;
   const planGoal = plan && goal && goal.race === plan.input.race ? goal : null;
   const paces = paceModel(activities, todayISO(), paceRef, planGoal);
 
@@ -250,6 +272,9 @@ export default function App() {
             <span>{profile?.name || "Profil"}</span>
           </button>
         </header>
+        {postRun && tab !== "nutrition" && (
+          <LossBanner info={postRun} today={todayISO()} onOpen={() => openHydration(postRun.activity.id)} onDismiss={() => dismissLoss(postRun.activity.id)} />
+        )}
         {tab !== "accueil" && <h1 className="page-title">{current.title}</h1>}
         {tab === "accueil" && (
           <Home
@@ -301,6 +326,7 @@ export default function App() {
             sweat={sweat}
             onAddWeighing={addWeighing}
             onDeleteWeighing={(id) => setSweat((prev) => prev.filter((w) => w.id !== id))}
+            startView={nutritionStart}
           />
         )}
       </main>

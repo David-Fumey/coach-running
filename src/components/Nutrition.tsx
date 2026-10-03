@@ -37,15 +37,17 @@ interface Props {
   sweat: Weighing[];
   onAddWeighing: (w: Omit<Weighing, "id">) => void;
   onDeleteWeighing: (id: string) => void;
+  /** Volet à ouvrir au départ (depuis le rappel d'hydratation) */
+  startView?: View;
 }
 
 const KIND_SHORT: Record<DayKind, string> = { repos: "Repos", facile: "Facile", intense: "Intense", long: "Long", course: "Course" };
 
-type View = "jour" | "hydratation" | "recettes" | "conseils";
+export type View = "jour" | "hydratation" | "recettes" | "conseils";
 
 /** Onglet « Nutrition » : le suivi du jour d'un côté, les conseils de l'autre. */
 export default function Nutrition(props: Props) {
-  const [view, setView] = useState<View>("jour");
+  const [view, setView] = useState<View>(props.startView ?? "jour");
   return (
     <div className="nutrition-tab">
       <div className="segmented segmented--4" role="group" aria-label="Section nutrition">

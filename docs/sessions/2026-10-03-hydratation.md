@@ -26,6 +26,13 @@
 - **Ajustement personnel** : médiane des rapports mesure / modèle, bornée entre 0,5 et 2, appliquée progressivement (un tiers de l'écart avec une pesée, deux tiers avec deux, en entier dès trois) pour qu'une pesée isolée ne déforme pas tout. Il multiplie l'estimation de l'eau perdue et l'objectif d'eau du jour. Une sortie pesée affiche sa **mesure** à la place de l'estimation.
 - La liste des pesées montre perte, taux et écart avec le modèle, avec suppression.
 
+## Rappel après une sortie (ajout)
+
+- Une **bannière** apparaît en haut du hub (sauf dans l'onglet Nutrition) pour la sortie la plus récente d'aujourd'hui ou d'hier : « environ 1,25 L d'eau perdue », fourchette, température de la montre si on l'a (sinon conditions tempérées), et la quantité à boire dans les 2 à 4 heures (120 à 150 %). Elle se calcule à partir des activités : elle apparaît donc dès que la synchronisation Strava a importé la sortie et lu sa température, et aussi pour une sortie saisie à la main.
+- Boutons « Voir l'hydratation » (ouvre directement ce volet de Nutrition) et « Fermer ». Les deux marquent la sortie comme vue (`foulee.lossseen.v1`, 50 dernières, **hors sauvegarde** : simple confort d'affichage).
+- Pas de rappel pour : une sortie de plus d'un jour, une sortie déjà vue, une sortie **déjà pesée** (la mesure suffit), une perte estimée sous 300 ml. Si la plus récente est écartée, on regarde la précédente.
+- Prend en compte le poids du profil (70 kg supposé sans profil) et l'ajustement personnel issu des pesées.
+
 ## Recettes : critères repliables
 
 La carte « Mes critères » est repliable (ouverte par défaut). Repliée, elle résume les critères actifs (« Végétarien · 15 min max. », ou « Aucun critère : toutes les recettes »).

@@ -24,7 +24,7 @@ import {
   type Water,
   type Weighing,
 } from "../lib/hydration";
-import { fmtDate, fmtDuration, fmtKm } from "../lib/format";
+import { fmtDate, fmtDuration, fmtKm, fmtVolume } from "../lib/format";
 import { todayISO } from "../storage";
 import SweatTest from "./SweatTest";
 
@@ -40,12 +40,6 @@ interface Props {
   sweat: Weighing[];
   onAddWeighing: (w: Omit<Weighing, "id">) => void;
   onDeleteWeighing: (id: string) => void;
-}
-
-/** 750 → « 750 ml », 1250 → « 1,25 L ». */
-function fmtVolume(ml: number): string {
-  if (ml < 1000) return `${Math.round(ml)} ml`;
-  return `${String(Math.round(ml / 10) / 100).replace(".", ",")} L`;
 }
 
 const STATE_TEXT: Record<Progress, string> = {
