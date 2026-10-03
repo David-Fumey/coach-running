@@ -205,6 +205,8 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                 </div>
                 <p className="activity__meta">
                   {s ? s.title : "Sortie libre"}{a.source === "strava" ? " · Strava" : ""} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
+                  {a.avgHr ? ` · FC ${a.avgHr} bpm` : ""}
+                  {a.elevation ? ` · D+ ${a.elevation} m` : ""}
                   {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
                 </p>
                 {a.note && <p className="hint">{a.note}</p>}

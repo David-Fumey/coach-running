@@ -45,12 +45,18 @@ export function periodLabel(b: Bucket, grain: Grain): string {
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 const sorties = (n: number) => (n === 0 ? "aucune sortie" : n === 1 ? "1 sortie" : `${n} sorties`);
-const describe = (b: Bucket, grain: Grain) => `${periodLabel(b, grain)} : ${fmtKm(round1(b.km))} km, ${sorties(b.count)}`;
+const describe = (b: Bucket, grain: Grain, metric: VolumeMetric) =>
+  metric === "km"
+    ? `${periodLabel(b, grain)} : ${fmtKm(round1(b.km))} km, ${sorties(b.count)}`
+    : `${periodLabel(b, grain)} : ${b.elevation === null ? "pas de dénivelé enregistré" : `${b.elevation} m de dénivelé`}`;
 
 /** Une étiquette sur `every`, en partant de la dernière période pour qu'elle reste toujours lisible. */
 const labelEvery = (slot: number) => Math.max(1, Math.ceil(MIN_LABEL_SPACE / slot));
 
 // ---------- Éléments communs ----------
+
+export type VolumeMetric = "km" | "elevation";
+export type TrendMetric = "pace" | "hr";
 
 interface ChartProps {
   buckets: Bucket[];
@@ -99,28 +105,33 @@ function barPath(x: number, top: number, w: number, bottom: number): string {
 
 // ---------- Distance ----------
 
-export function VolumeChart({ buckets, grain, selected, onSelect }: ChartProps) {
+export function VolumeChart({ buckets, grain, selected, onSelect, metric }: ChartProps & { metric: VolumeMetric }) {
+  const val = (b: Bucket) => (metric === "km" ? b.km : (b.elevation ?? 0));
   const [ref, width] = useWidth<HTMLDivElement>();
   const pw = Math.max(60, width - ML - MR);
   const ph = H - MT - MB;
-  const max = Math.max(1, ...buckets.map((b) => Math.max(b.km, b.plannedKm ?? 0)));
+  const max = Math.max(1, ...buckets.map((b) => Math.max(val(b), metric === "km" ? (b.plannedKm ?? 0) : 0)));
   const { ticks, top } = niceTicks(max);
   const slot = pw / buckets.length;
   const bw = Math.min(20, Math.max(3, slot * 0.56));
-  const y = (km: number) => MT + ph - (km / top) * ph;
+  const y = (v: number) => MT + ph - (v / top) * ph;
 
   // La période en cours est incomplète : elle ne compte pas dans la moyenne (sauf si elle est la seule).
   const complete = buckets.filter((b) => !b.future && !b.current);
   const past = complete.length > 0 ? complete : buckets.filter((b) => !b.future);
-  const avg = past.length > 0 ? past.reduce((s, b) => s + b.km, 0) / past.length : 0;
+  const avg = past.length > 0 ? past.reduce((s, b) => s + val(b), 0) / past.length : 0;
 
   return (
     <div ref={ref} className="chart">
-      <svg width={width} height={H} role="group" aria-label="Kilomètres par période">
+      <svg width={width} height={H} role="group" aria-label={metric === "km" ? "Kilomètres par période" : "Dénivelé par période"}>
         <defs>
           <linearGradient id="g-vol" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" style={{ stopColor: "var(--done)", stopOpacity: 1 }} />
             <stop offset="1" style={{ stopColor: "var(--done)", stopOpacity: 0.45 }} />
+          </linearGradient>
+          <linearGradient id="g-elev" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: "var(--p-specifique)", stopOpacity: 1 }} />
+            <stop offset="1" style={{ stopColor: "var(--p-specifique)", stopOpacity: 0.4 }} />
           </linearGradient>
           <linearGradient id="g-now" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" style={{ stopColor: "var(--accent)", stopOpacity: 1 }} />
@@ -145,8 +156,8 @@ export function VolumeChart({ buckets, grain, selected, onSelect }: ChartProps) 
             return (
               <g key={b.start} className={i === selected ? "bar-group bar-group--sel" : "bar-group"}>
                 {i === selected && <rect className="slot-sel" x={ML + slot * i} y={MT - 4} width={slot} height={ph + 8} rx={6} />}
-                {b.plannedKm !== null && b.plannedKm > 0 && <path className="bar-plan" d={barPath(x, y(b.plannedKm), bw, y(0))} />}
-                {b.km > 0 && <path className={b.current ? "bar-actual bar-actual--now" : "bar-actual"} d={barPath(x, y(b.km), bw, y(0))} style={{ animationDelay: `${Math.min(i, 30) * 12}ms` }} />}
+                {metric === "km" && b.plannedKm !== null && b.plannedKm > 0 && <path className="bar-plan" d={barPath(x, y(b.plannedKm), bw, y(0))} />}
+                {val(b) > 0 && <path className={b.current ? "bar-actual bar-actual--now" : metric === "km" ? "bar-actual" : "bar-actual bar-actual--elev"} d={barPath(x, y(val(b)), bw, y(0))} style={{ animationDelay: `${Math.min(i, 30) * 12}ms` }} />}
               </g>
             );
           })}
@@ -161,21 +172,21 @@ export function VolumeChart({ buckets, grain, selected, onSelect }: ChartProps) 
         <XAxis buckets={buckets} grain={grain} slot={slot} width={width} />
 
         {buckets.map((b, i) => (
-          <Slot key={b.start} x={ML + slot * i} width={slot} label={describe(b, grain)} pressed={i === selected} onSelect={() => onSelect(i)} />
+          <Slot key={b.start} x={ML + slot * i} width={slot} label={describe(b, grain, metric)} pressed={i === selected} onSelect={() => onSelect(i)} />
         ))}
       </svg>
       <p className="legend">
         <span className="legend__item">
-          <i className="legend__swatch legend__swatch--actual" /> Couru
+          <i className={metric === "km" ? "legend__swatch legend__swatch--actual" : "legend__swatch legend__swatch--elev"} /> {metric === "km" ? "Couru" : "Dénivelé positif"}
         </span>
-        {buckets.some((b) => b.plannedKm !== null) && (
+        {metric === "km" && buckets.some((b) => b.plannedKm !== null) && (
           <span className="legend__item">
             <i className="legend__swatch legend__swatch--plan" /> Prévu
           </span>
         )}
         {avg > 0 && (
           <span className="legend__item">
-            <i className="legend__swatch legend__swatch--avg" /> Moyenne {fmtKm(round1(avg))} km
+            <i className="legend__swatch legend__swatch--avg" /> Moyenne {metric === "km" ? `${fmtKm(round1(avg))} km` : `${Math.round(avg)} m`}
           </span>
         )}
       </p>
@@ -183,39 +194,49 @@ export function VolumeChart({ buckets, grain, selected, onSelect }: ChartProps) 
   );
 }
 
-// ---------- Allure ----------
+// ---------- Allure et fréquence cardiaque ----------
 
-export function PaceChart({ buckets, grain, selected, onSelect }: ChartProps) {
+/** Pas de graduation « rond » pour une plage donnée. */
+function stepFor(metric: TrendMetric, span: number): number {
+  if (metric === "pace") return span <= 1.2 ? 0.25 : span <= 3 ? 0.5 : 1;
+  return span <= 20 ? 5 : span <= 50 ? 10 : 20;
+}
+
+export function TrendChart({ buckets, grain, selected, onSelect, metric }: ChartProps & { metric: TrendMetric }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const pw = Math.max(60, width - ML - MR);
   const ph = H - MT - MB;
   const slot = pw / buckets.length;
-  const paces = buckets.map((b) => b.pace);
-  const known = paces.filter((p): p is number => p !== null);
+  const values = buckets.map((b) => (metric === "pace" ? b.pace : b.hr));
+  const known = values.filter((p): p is number => p !== null);
+  const fmt = (v: number) => (metric === "pace" ? fmtPace(v) : String(Math.round(v)));
 
   if (known.length < 2) {
     return (
       <div ref={ref} className="chart">
-        <p className="hint">Il faut des sorties sur au moins deux périodes pour tracer une courbe d'allure.</p>
+        <p className="hint">
+          {metric === "pace"
+            ? "Il faut des sorties sur au moins deux périodes pour tracer une courbe d'allure."
+            : "Aucune fréquence cardiaque sur ces périodes. Elle vient de ta montre, via Strava."}
+        </p>
       </div>
     );
   }
 
   const lo = Math.min(...known);
   const hi = Math.max(...known);
-  const span = hi - lo;
-  const step = span <= 1.2 ? 0.25 : span <= 3 ? 0.5 : 1;
+  const step = stepFor(metric, hi - lo);
   const yMin = Math.floor(lo / step) * step;
   const yMax = Math.max(Math.ceil(hi / step) * step, yMin + step);
   const ticks: number[] = [];
   for (let v = yMin; v <= yMax + 1e-9; v += step) ticks.push(v);
-  // Plus rapide (allure basse) en haut.
-  const y = (p: number) => MT + ((p - yMin) / (yMax - yMin)) * ph;
+  // Allure : la plus rapide (valeur basse) en haut. Fréquence : la plus élevée en haut.
+  const y = (p: number) => MT + ((metric === "pace" ? p - yMin : yMax - p) / (yMax - yMin)) * ph;
   const x = (i: number) => ML + slot * (i + 0.5);
 
-  // Segments continus : une période sans sortie interrompt la courbe.
+  // Segments continus : une période sans donnée interrompt la courbe.
   const segments: number[][] = [];
-  paces.forEach((p, i) => {
+  values.forEach((p, i) => {
     if (p === null) return;
     const last = segments[segments.length - 1];
     if (last && last[last.length - 1] === i - 1) last.push(i);
@@ -224,22 +245,28 @@ export function PaceChart({ buckets, grain, selected, onSelect }: ChartProps) {
   const curve = (idx: number[]) =>
     idx
       .map((i, k) => {
-        if (k === 0) return `M${x(i).toFixed(1)} ${y(paces[i]!).toFixed(1)}`;
+        if (k === 0) return `M${x(i).toFixed(1)} ${y(values[i]!).toFixed(1)}`;
         const p = idx[k - 1];
         const mx = (x(p) + x(i)) / 2;
-        return `C${mx.toFixed(1)} ${y(paces[p]!).toFixed(1)} ${mx.toFixed(1)} ${y(paces[i]!).toFixed(1)} ${x(i).toFixed(1)} ${y(paces[i]!).toFixed(1)}`;
+        return `C${mx.toFixed(1)} ${y(values[p]!).toFixed(1)} ${mx.toFixed(1)} ${y(values[i]!).toFixed(1)} ${x(i).toFixed(1)} ${y(values[i]!).toFixed(1)}`;
       })
       .join("");
   const area = (idx: number[]) => `${curve(idx)}L${x(idx[idx.length - 1]).toFixed(1)} ${H - MB}L${x(idx[0]).toFixed(1)} ${H - MB}Z`;
-  const sel = paces[selected];
+  const sel = values[selected];
+  const gradient = metric === "pace" ? "g-pace" : "g-hr";
+
+  const labelOf = (b: Bucket, v: number | null) =>
+    v === null
+      ? `${periodLabel(b, grain)} : ${metric === "pace" ? "aucune sortie" : "pas de fréquence cardiaque"}`
+      : `${periodLabel(b, grain)} : ${metric === "pace" ? `${fmtPace(v)} par km` : `${Math.round(v)} battements par minute en moyenne`}`;
 
   return (
-    <div ref={ref} className="chart">
-      <svg width={width} height={H} role="group" aria-label="Allure moyenne par période">
+    <div ref={ref} className={metric === "pace" ? "chart" : "chart chart--hr"}>
+      <svg width={width} height={H} role="group" aria-label={metric === "pace" ? "Allure moyenne par période" : "Fréquence cardiaque moyenne par période"}>
         <defs>
-          <linearGradient id="g-pace" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" style={{ stopColor: "var(--p-construction)", stopOpacity: 0.28 }} />
-            <stop offset="1" style={{ stopColor: "var(--p-construction)", stopOpacity: 0 }} />
+          <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: metric === "pace" ? "var(--p-construction)" : "var(--t-long)", stopOpacity: 0.28 }} />
+            <stop offset="1" style={{ stopColor: metric === "pace" ? "var(--p-construction)" : "var(--t-long)", stopOpacity: 0 }} />
           </linearGradient>
         </defs>
 
@@ -248,7 +275,7 @@ export function PaceChart({ buckets, grain, selected, onSelect }: ChartProps) {
             <g key={t}>
               <line className="grid" x1={ML} x2={width - MR} y1={y(t)} y2={y(t)} />
               <text x={ML - 8} y={y(t) + 4} textAnchor="end">
-                {fmtPace(t)}
+                {fmt(t)}
               </text>
             </g>
           ))}
@@ -256,34 +283,37 @@ export function PaceChart({ buckets, grain, selected, onSelect }: ChartProps) {
 
         {sel !== null && sel !== undefined && <line className="guide" x1={x(selected)} x2={x(selected)} y1={MT - 4} y2={H - MB} />}
 
-        <g key={`${grain}-${buckets[0]?.start}-${buckets.length}`} className="pace">
+        <g key={`${metric}-${grain}-${buckets[0]?.start}-${buckets.length}`} className="pace">
           {segments.filter((s) => s.length > 1).map((s) => (
-            <path key={`a${s[0]}`} className="pace-area" d={area(s)} />
+            <path key={`a${s[0]}`} className="pace-area" style={{ fill: `url(#${gradient})` }} d={area(s)} />
           ))}
           {segments.filter((s) => s.length > 1).map((s) => (
             <path key={`l${s[0]}`} className="pace-line" d={curve(s)} />
           ))}
-          {buckets.map((b, i) =>
-            b.pace === null ? null : <circle key={b.start} className={i === selected ? "pace-dot pace-dot--sel" : "pace-dot"} cx={x(i)} cy={y(b.pace)} r={i === selected ? 5.5 : 3.5} />
-          )}
+          {buckets.map((b, i) => {
+            const v = values[i];
+            return v === null ? null : <circle key={b.start} className={i === selected ? "pace-dot pace-dot--sel" : "pace-dot"} cx={x(i)} cy={y(v)} r={i === selected ? 5.5 : 3.5} />;
+          })}
         </g>
 
         <XAxis buckets={buckets} grain={grain} slot={slot} width={width} />
 
         {buckets.map((b, i) => (
-          <Slot
-            key={b.start}
-            x={ML + slot * i}
-            width={slot}
-            label={b.pace === null ? `${periodLabel(b, grain)} : aucune sortie` : `${periodLabel(b, grain)} : ${fmtPace(b.pace)} par km`}
-            pressed={i === selected}
-            onSelect={() => onSelect(i)}
-          />
+          <Slot key={b.start} x={ML + slot * i} width={slot} label={labelOf(b, values[i])} pressed={i === selected} onSelect={() => onSelect(i)} />
         ))}
       </svg>
       <p className="legend">
-        <span className="legend__item">Plus haut = plus rapide</span>
-        <span className="legend__item">Meilleure : {fmtPace(lo)} /km</span>
+        {metric === "pace" ? (
+          <>
+            <span className="legend__item">Plus haut = plus rapide</span>
+            <span className="legend__item">Meilleure : {fmtPace(lo)} /km</span>
+          </>
+        ) : (
+          <>
+            <span className="legend__item">Moyenne par période, en battements par minute</span>
+            <span className="legend__item">Plus haute : {Math.round(hi)}</span>
+          </>
+        )}
       </p>
     </div>
   );

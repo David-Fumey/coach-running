@@ -8,6 +8,7 @@ import {
   clampStart,
   defaultSelection,
   defaultStart,
+  extrasOf,
   inScope,
   planRange,
   startOf,
@@ -16,7 +17,7 @@ import {
 } from "../lib/progress";
 import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 import { todayISO } from "../storage";
-import { PaceChart, VolumeChart, periodLabel } from "./charts";
+import { TrendChart, VolumeChart, periodLabel, type TrendMetric, type VolumeMetric } from "./charts";
 
 interface Props {
   plan: Plan;
@@ -45,6 +46,8 @@ export default function Progress({ plan, done, activities }: Props) {
   /** Début de la fenêtre choisi avec les flèches ; null = fenêtre par défaut */
   const [startPick, setStartPick] = useState<number | null>(null);
   const [selPick, setSelPick] = useState<number | null>(null);
+  const [volumeMetric, setVolumeMetric] = useState<VolumeMetric>("km");
+  const [trendMetric, setTrendMetric] = useState<TrendMetric>("pace");
 
   if (activities.length === 0) {
     return (
@@ -56,6 +59,10 @@ export default function Progress({ plan, done, activities }: Props) {
 
   const scoped = inScope(plan, activities, scope);
   const sum = summarize(plan, scoped, done, today);
+  const extras = extrasOf(scoped);
+  // Une mesure sans donnée disparaît : on revient alors à la mesure de base.
+  const vMetric: VolumeMetric = extras.elevation !== null ? volumeMetric : "km";
+  const tMetric: TrendMetric = extras.hr !== null ? trendMetric : "pace";
   const all = bucketsOf(plan, activities, scope, grain, today);
   const size = Math.min(WINDOW_SIZE[grain], all.length);
   const start = clampStart(all.length, size, startPick ?? defaultStart(all, size, scope));
@@ -120,6 +127,8 @@ export default function Progress({ plan, done, activities }: Props) {
         ) : (
           <Stat label="Par semaine" value={fmtKm(round1(sum.km / weeksCovered))} unit="km" />
         )}
+        {extras.elevation !== null && <Stat label="Dénivelé" value={Math.round(extras.elevation).toLocaleString("fr-FR")} unit="m" />}
+        {extras.hr !== null && <Stat label="FC moy." value={String(Math.round(extras.hr))} unit="bpm" />}
       </dl>
 
       {view.length === 0 ? (
@@ -129,7 +138,7 @@ export default function Progress({ plan, done, activities }: Props) {
           <section className="card chart-card" aria-labelledby="chart-volume">
             <div className="card__head">
               <h2 id="chart-volume" className="card__title">
-                Distance
+                {vMetric === "km" ? "Distance" : "Dénivelé"}
               </h2>
               <div className="pager">
                 <button type="button" className="pager__btn" aria-label="Périodes précédentes" disabled={start <= 0} onClick={() => move(-1)}>
@@ -140,6 +149,16 @@ export default function Progress({ plan, done, activities }: Props) {
                 </button>
               </div>
             </div>
+            {extras.elevation !== null && (
+              <div className="segmented" role="group" aria-label="Mesure">
+                <button type="button" aria-pressed={vMetric === "km"} onClick={() => setVolumeMetric("km")}>
+                  Distance
+                </button>
+                <button type="button" aria-pressed={vMetric === "elevation"} onClick={() => setVolumeMetric("elevation")}>
+                  Dénivelé
+                </button>
+              </div>
+            )}
             <div className="segmented segmented--3" role="group" aria-label="Regroupement">
               {GRAINS.map((g) => (
                 <button key={g.id} type="button" aria-pressed={grain === g.id} onClick={() => pickGrain(g.id)}>
@@ -149,7 +168,7 @@ export default function Progress({ plan, done, activities }: Props) {
             </div>
             <p className="chart-card__range">{range}</p>
 
-            <VolumeChart buckets={view} grain={grain} selected={selected} onSelect={setSelPick} />
+            <VolumeChart buckets={view} grain={grain} selected={selected} onSelect={setSelPick} metric={vMetric} />
 
             <div className="readout" role="status" aria-live="polite">
               <p className="readout__title">
@@ -183,15 +202,37 @@ export default function Progress({ plan, done, activities }: Props) {
                   <dt>Allure</dt>
                   <dd>{picked.pace === null ? "–" : `${fmtPace(picked.pace)} /km`}</dd>
                 </div>
+                {picked.elevation !== null && (
+                  <div>
+                    <dt>Dénivelé</dt>
+                    <dd>{picked.elevation} m</dd>
+                  </div>
+                )}
+                {picked.hr !== null && (
+                  <div>
+                    <dt>FC moy.</dt>
+                    <dd>{Math.round(picked.hr)} bpm</dd>
+                  </div>
+                )}
               </dl>
             </div>
           </section>
 
           <section className="card chart-card" aria-labelledby="chart-pace">
             <h2 id="chart-pace" className="card__title">
-              Allure moyenne
+              {tMetric === "pace" ? "Allure moyenne" : "Fréquence cardiaque"}
             </h2>
-            <PaceChart buckets={view} grain={grain} selected={selected} onSelect={setSelPick} />
+            {extras.hr !== null && (
+              <div className="segmented" role="group" aria-label="Mesure">
+                <button type="button" aria-pressed={tMetric === "pace"} onClick={() => setTrendMetric("pace")}>
+                  Allure
+                </button>
+                <button type="button" aria-pressed={tMetric === "hr"} onClick={() => setTrendMetric("hr")}>
+                  Fréquence cardiaque
+                </button>
+              </div>
+            )}
+            <TrendChart buckets={view} grain={grain} selected={selected} onSelect={setSelPick} metric={tMetric} />
           </section>
         </>
       )}

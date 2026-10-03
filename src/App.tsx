@@ -69,6 +69,9 @@ export default function App() {
       ...a,
       id: id ?? `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       ...(origin?.externalId ? { source: origin.source, externalId: origin.externalId } : {}),
+      ...(origin?.avgHr !== undefined ? { avgHr: origin.avgHr } : {}),
+      ...(origin?.maxHr !== undefined ? { maxHr: origin.maxHr } : {}),
+      ...(origin?.elevation !== undefined ? { elevation: origin.elevation } : {}),
     };
     const next = id ? updateActivity({ activities, done }, activity) : addActivity({ activities, done }, activity);
     setActivities(next.activities);

@@ -2423,3 +2423,28 @@ button {
 .progress-tab .stats {
   grid-template-columns: repeat(3, 1fr);
 }
+
+.chart .bar-actual--elev {
+  fill: url(#g-elev);
+}
+
+.chart .bar-actual--now {
+  fill: url(#g-now);
+}
+
+.chart--hr .pace-line {
+  stroke: var(--t-long);
+}
+
+.chart--hr .pace-dot {
+  stroke: var(--t-long);
+}
+
+.chart--hr .pace-dot--sel {
+  fill: var(--t-long);
+  stroke: var(--surface);
+}
+
+.legend__swatch--elev {
+  background: linear-gradient(var(--p-specifique), color-mix(in srgb, var(--p-specifique) 40%, transparent));
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Plan } from "./lib/plan";
 import type { Activity } from "./lib/activities";
-import { EMPTY_STRAVA, authorizeUrl, isConnected, mergeStrava, parseCallback, syncAfter, type StravaState } from "./lib/strava";
+import { EMPTY_STRAVA, STRAVA_SCHEMA, authorizeUrl, isConnected, mergeStrava, parseCallback, syncAfter, type StravaState } from "./lib/strava";
 import { StravaError, exchangeCode, fetchRuns, type FetchLike } from "./lib/stravaClient";
 import { useStoredState } from "./storage";
 
@@ -47,6 +47,13 @@ const browserFetch: FetchLike = (url, init) => fetch(url, init);
 /** Redirection vers Strava : même page qu'actuellement, sans paramètre. */
 const redirectUri = () => window.location.origin + window.location.pathname;
 
+function syncMessage(added: number, enriched: number): string {
+  const parts: string[] = [];
+  if (added > 0) parts.push(added === 1 ? "1 nouvelle course importée" : `${added} nouvelles courses importées`);
+  if (enriched > 0) parts.push(enriched === 1 ? "1 course complétée (fréquence cardiaque, dénivelé)" : `${enriched} courses complétées (fréquence cardiaque, dénivelé)`);
+  return parts.length === 0 ? "Tout est à jour." : `${parts.join(", ")}.`;
+}
+
 const randomNonce = () => crypto.getRandomValues(new Uint32Array(4)).join("-");
 
 /**
@@ -73,19 +80,16 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
       const { tokens, runs } = await fetchRuns(s, s.tokens, full ? 0 : syncAfter(s.lastSync), Math.floor(Date.now() / 1000), browserFetch);
       const cur = latest.current;
       const merged = mergeStrava(cur.plan ?? p, { activities: cur.activities, done: cur.done }, cur.state.seen, runs);
-      if (merged.added + merged.matched > 0) {
+      if (merged.added + merged.matched + merged.enriched > 0) {
         setActivities(merged.state.activities);
         setDone(merged.state.done);
       }
-      setState((prev) => ({ ...prev, tokens, lastSync: Date.now(), seen: merged.seen }));
+      // Une lecture complète a couvert tout l'historique : les détails (cœur, dénivelé) sont à jour.
+      const complete = full || s.lastSync === null;
+      setState((prev) => ({ ...prev, tokens, lastSync: Date.now(), seen: merged.seen, ...(complete ? { schema: STRAVA_SCHEMA } : {}) }));
       setStatus({
         kind: "ok",
-        text:
-          merged.added === 0
-            ? "Tout est à jour."
-            : merged.added === 1
-              ? "1 nouvelle course importée."
-              : `${merged.added} nouvelles courses importées.`,
+        text: syncMessage(merged.added, merged.enriched),
       });
     } catch (e) {
       setStatus({ kind: "error", text: e instanceof StravaError ? e.message : "La synchronisation avec Strava a échoué." });
@@ -121,7 +125,8 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
     if (!plan || !confirmed || !isConnected(state)) return;
     if (!autoSynced.current) {
       autoSynced.current = true;
-      void sync();
+      // Après une mise à jour de l'appli qui lit plus de données, on relit tout l'historique une fois.
+      void sync((state.schema ?? 0) < STRAVA_SCHEMA);
     }
     const onVisible = () => {
       const last = latest.current.state.lastSync;
