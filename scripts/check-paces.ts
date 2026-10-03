@@ -1,5 +1,6 @@
 import { generatePlan, type Session } from "../src/lib/plan.ts";
 import type { Activity } from "../src/lib/activities.ts";
+import { RACE_KM, goalPace, predictMinutes, vdotFromRace } from "../src/lib/goal.ts";
 import {
   FALLBACK_RUNS, MIN_RUNS, ZONES, ZONE_ORDER, comparePace, paceAt, paceModel, referenceFromActivities, targetsFor, vdotFromAveragePace, zoneRange,
 } from "../src/lib/paces.ts";
@@ -102,6 +103,43 @@ const race = find(marathon, (f) => f.s.type === "race")!;
 check("jour de course : pas de cible", targetsFor(model, marathon, race.s) === null);
 check("séance inconnue : pas de cible", targetsFor(model, marathon, { ...easy.s, id: "inconnue" }) === null);
 check("toute séance du plan a une réponse sans erreur", marathon.weeks.flatMap((w) => w.sessions).every((s) => { targetsFor(model, marathon, s); return true; }));
+
+// ---------- Temps objectif ----------
+const fasterMarathon = { race: "marathon" as const, minutes: predictMinutes(model.vdot + 5, RACE_KM.marathon) }; // objectif nettement plus rapide que le niveau
+const slowerMarathon = { race: "marathon" as const, minutes: predictMinutes(model.vdot - 5, RACE_KM.marathon) }; // objectif plus facile que le niveau
+const gp = goalPace(fasterMarathon);
+const within = (t: { slow: number; fast: number }, pace: number, margin = 0.011) => t.slow <= pace * (1 + margin) && t.fast >= pace * (1 - margin - 0.001);
+
+const raceDay = targetsFor(model, marathon, race.s, fasterMarathon)!;
+check("jour de course : allure objectif", raceDay.targets[0].label === "Allure objectif" && within(raceDay.targets[0], gp) && !raceDay.comparable, raceDay);
+check("jour de course sans objectif : toujours rien", targetsFor(model, marathon, race.s) === null);
+const specGoal = targetsFor(model, marathon, qSpec.s, fasterMarathon)!;
+check("blocs spécifiques : exactement l'allure objectif", specGoal.targets[0].label === "Allure objectif" && within(specGoal.targets[0], gp), specGoal);
+check("l'objectif plus rapide donne des blocs plus rapides que sans objectif", specGoal.targets[0].fast < targetsFor(model, marathon, qSpec.s)!.targets[0].fast);
+const longGoal = targetsFor(model, marathon, longSpec.s, fasterMarathon)!;
+check("sortie longue spécifique : facile inchangé, derniers km à l'objectif", near(longGoal.targets[0].slow, tLong.targets[0].slow) && longGoal.targets[1].label.includes("objectif") && within(longGoal.targets[1], gp), longGoal);
+const easyGoal = targetsFor(model, marathon, easy.s, fasterMarathon)!;
+check("le facile ne bouge pas avec l'objectif", near(easyGoal.targets[0].slow, tEasy.targets[0].slow) && near(easyGoal.targets[0].fast, tEasy.targets[0].fast));
+check("la récupération non plus", near(targetsFor(model, marathon, rec.s, fasterMarathon)!.targets[0].slow, targetsFor(model, marathon, rec.s)!.targets[0].slow));
+
+const tempoSessions = marathon.weeks.flatMap((w) => w.sessions.filter((s) => s.type === "tempo").map((s) => ({ s, w })));
+const firstTempo = tempoSessions[0];
+const lastBuildTempo = [...tempoSessions].reverse().find((x) => x.w.phase !== "affutage" && x.w.phase !== "course")!;
+check("seuil de la première semaine : niveau actuel", near(targetsFor(model, marathon, firstTempo.s, fasterMarathon)!.targets[0].fast, targetsFor(model, marathon, firstTempo.s)!.targets[0].fast, 1e-9));
+check("seuil en fin de construction : plus rapide qu'au départ pour un objectif exigeant", targetsFor(model, marathon, lastBuildTempo.s, fasterMarathon)!.targets[0].fast < targetsFor(model, marathon, lastBuildTempo.s)!.targets[0].fast);
+const seuilPaces = tempoSessions.filter((x) => x.w.phase !== "affutage" && x.w.phase !== "course").map((x) => targetsFor(model, marathon, x.s, fasterMarathon)!.targets[0].fast);
+check("le seuil accélère régulièrement sur la construction", seuilPaces.every((p, i) => i === 0 || p <= seuilPaces[i - 1] + 1e-9), seuilPaces);
+check("objectif plus facile que le niveau : le travail ne ralentit jamais", tempoSessions.every((x) => near(targetsFor(model, marathon, x.s, slowerMarathon)!.targets[0].fast, targetsFor(model, marathon, x.s)!.targets[0].fast, 1e-9)));
+check("objectif d'une autre course : ignoré", targetsFor(model, marathon, lastBuildTempo.s, { race: "10k", minutes: 38 })!.targets[0].fast === targetsFor(model, marathon, lastBuildTempo.s)!.targets[0].fast && targetsFor(model, marathon, race.s, { race: "10k", minutes: 38 }) === null);
+const q10Goal = targetsFor(model, tenK, q10.s, { race: "10k", minutes: 42 })!.targets[0];
+check("10 km : allure objectif ou un peu plus vite", q10Goal.label === "Allure objectif ou un peu plus vite" && q10Goal.fast < goalPace({ race: "10k", minutes: 42 }) * 0.985 && q10Goal.slow > goalPace({ race: "10k", minutes: 42 }), q10Goal);
+
+const goalOnly = paceModel([], today, null, { race: "10k", minutes: 42 })!;
+check("sans sortie ni saisie : le niveau vient de l'objectif", goalOnly.reference.source === "objectif" && near(goalOnly.vdot, vdotFromRace(10, 42), 1e-9) && near(paceAt(goalOnly.vdot, 0.7), goalOnly.reference.pace, 1e-9));
+check("avec des sorties, l'objectif ne change pas le niveau", paceModel(steady, today, null, { race: "10k", minutes: 42 })!.reference.source === "recentes" && near(paceModel(steady, today, null, { race: "10k", minutes: 42 })!.vdot, paceModel(steady, today, null)!.vdot, 1e-9));
+check("rien du tout : pas de modèle", paceModel([], today, null, null) === null);
+const onlyGoalTargets = targetsFor(goalOnly, tenK, q10.s, { race: "10k", minutes: 42 });
+check("cibles possibles avec le seul objectif", onlyGoalTargets !== null && onlyGoalTargets.targets.length === 1);
 
 // ---------- Comparaison ----------
 const range = { slow: 6.5, fast: 6.0 };

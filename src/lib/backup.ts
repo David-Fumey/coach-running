@@ -4,6 +4,7 @@
 import type { Plan } from "./plan.ts";
 import type { Activity } from "./activities.ts";
 import { isValidPace } from "./paces.ts";
+import { validGoal, type Goal } from "./goal.ts";
 import { GOALS, validateProfile, type Food, type Profile } from "./nutrition.ts";
 
 export interface Snapshot {
@@ -15,9 +16,11 @@ export interface Snapshot {
   foods: Food[];
   /** Allure moyenne d'entraînement saisie à la main (min/km) ; null = calculée sur les sorties */
   paceRef: number | null;
+  /** Temps objectif de course (une seule course à la fois) */
+  goal: Goal | null;
 }
 
-export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null };
+export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null };
 
 const APP = "foulee";
 const VERSION = 1;
@@ -115,6 +118,7 @@ export function parseBackup(text: string): ParseResult {
   const profile = d.profile ?? null;
   const confirmed = d.confirmed ?? false;
   const paceRef = d.paceRef ?? null;
+  const goal = d.goal ?? null;
 
   if (plan !== null && !validPlan(plan)) return { ok: false, error: "Le plan contenu dans le fichier est invalide." };
   if (!isObj(done) || !Object.values(done).every((v) => v === true)) return { ok: false, error: "Les séances validées du fichier sont invalides." };
@@ -123,6 +127,7 @@ export function parseBackup(text: string): ParseResult {
   if (profile !== null && !validProfile(profile)) return { ok: false, error: "Le profil contenu dans le fichier est invalide." };
   if (typeof confirmed !== "boolean") return { ok: false, error: "Le fichier est invalide." };
   if (paceRef !== null && !isValidPace(paceRef)) return { ok: false, error: "L'allure moyenne du fichier est invalide." };
+  if (goal !== null && !validGoal(goal)) return { ok: false, error: "Le temps objectif du fichier est invalide." };
 
   return {
     ok: true,
@@ -133,6 +138,7 @@ export function parseBackup(text: string): ParseResult {
       foods: foods as Food[],
       profile: profile as Profile | null,
       paceRef: paceRef as number | null,
+      goal: goal as Goal | null,
       confirmed: plan === null ? false : confirmed,
     },
   };

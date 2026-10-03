@@ -9,6 +9,7 @@
 import type { Plan, RaceKey, Session } from "./plan.ts";
 import { diffDays } from "./plan.ts";
 import type { Activity } from "./activities.ts";
+import { RACE_KM, goalPace, vdotFromRace, type Goal } from "./goal.ts";
 
 /** Sorties plus courtes que cela : exclues de la moyenne (échauffements, marche, sorties de test). */
 export const MIN_RUN_KM = 3;
@@ -86,7 +87,8 @@ const RACE_ZONE: Record<RaceKey, ZoneId> = { "5k": "5k", "10k": "10k", semi: "se
 
 // ---------- Référence : la moyenne des sorties ----------
 
-export type ReferenceSource = "manuelle" | "recentes" | "dernieres";
+/** « objectif » : ni sorties ni saisie, le niveau vient du temps objectif de course. */
+export type ReferenceSource = "manuelle" | "recentes" | "dernieres" | "objectif";
 
 export interface Reference {
   /** Allure moyenne d'entraînement, en min/km */
@@ -100,6 +102,8 @@ export interface Reference {
 export interface PaceModel {
   reference: Reference;
   vdot: number;
+  /** Temps objectif de la course du plan, s'il y en a un */
+  goal: Goal | null;
 }
 
 const paceOfRun = (a: Activity) => a.minutes / a.km;
@@ -148,12 +152,20 @@ export function referenceFromActivities(activities: Activity[], today: string): 
 
 export const isValidPace = (p: unknown): p is number => typeof p === "number" && Number.isFinite(p) && p >= PACE_BOUNDS.min && p <= PACE_BOUNDS.max;
 
-/** Modèle d'allures : la saisie manuelle s'il y en a une, sinon la moyenne des sorties. Null sans base. */
-export function paceModel(activities: Activity[], today: string, manual: number | null): PaceModel | null {
+const clampVdot = (v: number) => Math.min(VDOT_BOUNDS.max, Math.max(VDOT_BOUNDS.min, v));
+
+/**
+ * Modèle d'allures : la saisie manuelle s'il y en a une, sinon la moyenne des sorties.
+ * Sans l'un ni l'autre, le temps objectif de course sert de base ; sans rien, null.
+ */
+export function paceModel(activities: Activity[], today: string, manual: number | null, goal: Goal | null = null): PaceModel | null {
   const reference: Reference | null = isValidPace(manual)
     ? { pace: manual, source: "manuelle", runs: 0, km: 0 }
     : referenceFromActivities(activities, today);
-  return reference ? { reference, vdot: vdotFromAveragePace(reference.pace) } : null;
+  if (reference) return { reference, vdot: vdotFromAveragePace(reference.pace), goal };
+  if (!goal) return null;
+  const vdot = clampVdot(vdotFromRace(RACE_KM[goal.race], goal.minutes));
+  return { reference: { pace: paceAt(vdot, AVERAGE_FRACTION), source: "objectif", runs: 0, km: 0 }, vdot, goal };
 }
 
 // ---------- Cibles par séance ----------
@@ -168,14 +180,35 @@ export interface SessionTargets {
   comparable: boolean;
 }
 
-/** Cibles d'une séance du plan, ou null quand l'effort ressenti suffit (fartlek, course). */
-export function targetsFor(model: PaceModel, plan: Plan, session: Session): SessionTargets | null {
+/** Marge autour de l'allure objectif : 1 % de part et d'autre. */
+const GOAL_MARGIN = 0.01;
+
+/**
+ * Cibles d'une séance du plan, ou null quand l'effort ressenti suffit (fartlek, course sans objectif).
+ * Avec un temps objectif pour cette course :
+ * - les allures de course (blocs spécifiques, derniers km des sorties longues, jour J) sont celles de l'objectif ;
+ * - les allures de travail (seuil, allure 10 km de la phase de construction) montent du niveau actuel vers le niveau
+ *   que demande l'objectif, linéairement jusqu'à la fin de la phase de construction, sans jamais passer sous le niveau actuel ;
+ * - le facile, la récupération et le facile des sorties longues restent calés sur le niveau actuel.
+ */
+export function targetsFor(model: PaceModel, plan: Plan, session: Session, goal: Goal | null = model.goal): SessionTargets | null {
   const week = plan.weeks.find((w) => w.sessions.some((s) => s.id === session.id));
   if (!week) return null;
   const race = plan.input.race;
   const raceZone = RACE_ZONE[race];
   const v = model.vdot;
-  const target = (label: string, zone: ZoneId, fasterBy = 0): PaceTarget => ({ label, ...zoneRange(v, zone, fasterBy) });
+  const g = goal && goal.race === race ? goal : null;
+  // Niveau demandé par l'objectif, et niveau d'entraînement de la semaine entre l'actuel et celui-là.
+  const goalVdot = g ? clampVdot(vdotFromRace(RACE_KM[race], g.minutes)) : null;
+  const buildWeeks = plan.weeks.filter((w) => w.phase !== "affutage" && w.phase !== "course").length;
+  const progress = Math.min(1, week.index / Math.max(1, buildWeeks - 1));
+  const weekVdot = goalVdot === null ? v : Math.max(v, v + (goalVdot - v) * progress);
+  const target = (label: string, zone: ZoneId, fasterBy = 0, level = v): PaceTarget => ({ label, ...zoneRange(level, zone, fasterBy) });
+  /** Allure de l'objectif ; `fasterBy` : part de l'allure en plus vite (0,02 = 2 %). */
+  const goalTarget = (label: string, fasterBy = 0): PaceTarget => {
+    const p = goalPace(g!);
+    return { label, slow: p * (1 + GOAL_MARGIN), fast: p * (1 - GOAL_MARGIN - fasterBy) };
+  };
 
   switch (session.type) {
     case "easy":
@@ -184,22 +217,27 @@ export function targetsFor(model: PaceModel, plan: Plan, session: Session): Sess
     case "shakeout":
       return { targets: [target("Très facile", "recuperation")], comparable: true };
     case "tempo":
-      return { targets: [target("Allure seuil", "seuil")], comparable: false };
+      return { targets: [target("Allure seuil", "seuil", 0, weekVdot)], comparable: false };
     case "long": {
       const easy = target("Allure facile", "facile");
       if (!week.isRecovery && week.phase === "specifique" && (race === "semi" || race === "marathon") && session.km >= 14) {
-        return { targets: [easy, target(`Derniers km : ${ZONES[raceZone].label.toLowerCase()}`, raceZone)], comparable: false };
+        const finish = g ? goalTarget("Derniers km : allure objectif") : target(`Derniers km : ${ZONES[raceZone].label.toLowerCase()}`, raceZone);
+        return { targets: [easy, finish], comparable: false };
       }
       return { targets: [easy], comparable: true };
     }
     case "quality": {
       if (week.phase === "base") return null; // fartlek au ressenti, sans chronomètre
       if (week.phase === "specifique" && (race === "semi" || race === "marathon")) {
-        return { targets: [target(ZONES[raceZone].label, raceZone)], comparable: false };
+        return { targets: [g ? goalTarget("Allure objectif") : target(ZONES[raceZone].label, raceZone)], comparable: false };
       }
-      if (week.phase === "specifique") return { targets: [target("Allure de course ou un peu plus vite", raceZone, 0.02)], comparable: false };
-      return { targets: [target("Allure 10 km", "10k")], comparable: false };
+      if (week.phase === "specifique") {
+        return { targets: [g ? goalTarget("Allure objectif ou un peu plus vite", 0.02) : target("Allure de course ou un peu plus vite", raceZone, 0.02)], comparable: false };
+      }
+      return { targets: [target("Allure 10 km", "10k", 0, weekVdot)], comparable: false };
     }
+    case "race":
+      return g ? { targets: [goalTarget("Allure objectif")], comparable: false } : null;
     default:
       return null;
   }
