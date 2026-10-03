@@ -1,0 +1,14 @@
+{
+  "name": "Foulée – plan de course",
+  "short_name": "Foulée",
+  "description": "Ton plan d'entraînement de course à pied, semaine après semaine.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef1f5",
+  "theme_color": "#14213d",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
