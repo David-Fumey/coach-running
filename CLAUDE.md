@@ -41,7 +41,7 @@ npm run test:strava      # vérifie l'import Strava (conversion, fusion sans dou
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts` ou `recipes.ts` ou `strava.ts` `progress.ts` ou `records.ts` doit garder les neuf scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts` ou `records.ts` doit garder les neuf scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 
