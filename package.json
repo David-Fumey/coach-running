@@ -18,7 +18,8 @@
     "test:records": "node --experimental-strip-types scripts/check-records.ts",
     "test:paces": "node --experimental-strip-types scripts/check-paces.ts",
     "test:goal": "node --experimental-strip-types scripts/check-goal.ts",
-    "test:shift": "node --experimental-strip-types scripts/check-shift.ts"
+    "test:shift": "node --experimental-strip-types scripts/check-shift.ts",
+    "test:hydration": "node --experimental-strip-types scripts/check-hydration.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",

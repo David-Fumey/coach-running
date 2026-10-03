@@ -24,6 +24,7 @@ const full: Snapshot = {
   foods: [{ id: "f1", date: "2026-10-05", label: "Riz", kcal: 300, carbs: 60 }],
   paceRef: 6.25,
   goal: { race: "10k", minutes: 47.5 },
+  water: [{ id: "w1", date: "2026-10-05", ml: 250 }, { id: "w2", date: "2026-10-05", ml: 500 }],
 };
 const text = makeBackup(full, new Date("2026-10-05T10:00:00Z"));
 
@@ -63,6 +64,11 @@ check("temps objectif invalide", err(mutate((o) => (o.data.goal = { race: "10k",
 check("temps objectif absent : null", (() => {
   const r = parseBackup(mutate((o) => delete o.data.goal));
   return r.ok && r.data.goal === null;
+})());
+check("hydratation invalide", err(mutate((o) => (o.data.water[0].ml = 0))) !== null && err(mutate((o) => (o.data.water[0].ml = 9000))) !== null && err(mutate((o) => (o.data.water[0].date = "hier"))) !== null && err(mutate((o) => (o.data.water = "beaucoup"))) !== null);
+check("hydratation absente : liste vide", (() => {
+  const r = parseBackup(mutate((o) => delete o.data.water));
+  return r.ok && r.data.water.length === 0;
 })());
 check("séances validées invalides", err(mutate((o) => (o.data.done = { x: "oui" }))) !== null);
 check("sans plan, jamais confirmé", (() => {
