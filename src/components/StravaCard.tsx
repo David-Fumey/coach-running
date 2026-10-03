@@ -89,6 +89,11 @@ export default function StravaCard({ strava }: { strava: StravaApi }) {
         </form>
       )}
 
+      {status.kind === "syncing" && status.text && (
+        <p className="hint" role="status">
+          {status.text}
+        </p>
+      )}
       {status.kind === "ok" && (
         <p className="notice" role="status">
           {status.text}

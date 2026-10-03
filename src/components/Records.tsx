@@ -64,6 +64,7 @@ export default function Records({ activities, today, scopeLabel }: Props) {
               </div>
               <p className="record__meta">
                 {day(r.best.date)} · {fmtPace(r.best.minutes / r.km)} /km
+                {r.best.fromEffort && r.best.km > r.km * 1.01 && <> · meilleur effort dans une sortie de {fmtKm(round1(r.best.km))} km</>}
                 {r.previous !== null && r.previous - r.best.minutes > 1 / 60 && <> · {fmtClock(r.previous - r.best.minutes)} de mieux que le record précédent</>}
                 {r.attempts > 1 && <> · {r.attempts} sorties</>}
               </p>
@@ -107,7 +108,7 @@ export default function Records({ activities, today, scopeLabel }: Props) {
       )}
 
       <p className="hint">
-        Un record de distance vient d'une sortie proche de cette distance (de 2 % en dessous à 6 % au-dessus). Le signe « ≈ » indique un temps ramené à la distance exacte. Foulée ne connaît pas les temps intermédiaires : le meilleur 5 km au milieu d'une sortie plus longue n'est pas détecté.
+        Un record de distance vient soit d'une sortie proche de cette distance (de 2 % en dessous à 6 % au-dessus), soit du meilleur effort mesuré par Strava au sein d'une sortie plus longue. Le signe « ≈ » indique un temps ramené à la distance exacte. Foulée n'analyse que les sorties les plus rapides de chaque distance, quelques-unes à chaque synchronisation : les records peuvent encore s'améliorer pendant les premières synchronisations.
       </p>
     </section>
   );

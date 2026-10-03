@@ -103,7 +103,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
         <div className="syncbar">
           <p className="syncbar__text" role="status">
             {strava.status.kind === "syncing"
-              ? "Synchronisation avec Strava…"
+              ? (strava.status.text ?? "Synchronisation avec Strava…")
               : strava.status.kind === "error"
                 ? strava.status.text
                 : strava.status.kind === "ok"

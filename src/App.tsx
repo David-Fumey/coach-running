@@ -72,6 +72,7 @@ export default function App() {
       ...(origin?.avgHr !== undefined ? { avgHr: origin.avgHr } : {}),
       ...(origin?.maxHr !== undefined ? { maxHr: origin.maxHr } : {}),
       ...(origin?.elevation !== undefined ? { elevation: origin.elevation } : {}),
+      ...(origin?.efforts !== undefined ? { efforts: origin.efforts } : {}),
     };
     const next = id ? updateActivity({ activities, done }, activity) : addActivity({ activities, done }, activity);
     setActivities(next.activities);

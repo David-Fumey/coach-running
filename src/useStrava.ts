@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Plan } from "./lib/plan";
 import type { Activity } from "./lib/activities";
-import { EMPTY_STRAVA, STRAVA_SCHEMA, authorizeUrl, isConnected, mergeStrava, parseCallback, syncAfter, type StravaState } from "./lib/strava";
-import { StravaError, exchangeCode, fetchRuns, type FetchLike } from "./lib/stravaClient";
+import {
+  EFFORT_CANDIDATES_PER_DISTANCE,
+  EMPTY_STRAVA,
+  STRAVA_SCHEMA,
+  applyEfforts,
+  authorizeUrl,
+  effortCandidates,
+  isConnected,
+  mergeStrava,
+  parseCallback,
+  stravaNumericId,
+  syncAfter,
+  type StravaState,
+} from "./lib/strava";
+import { StravaError, exchangeCode, fetchEfforts, fetchRuns, type FetchLike } from "./lib/stravaClient";
 import { useStoredState } from "./storage";
 
 export type StravaStatus =
   | { kind: "idle" }
-  | { kind: "syncing" }
+  | { kind: "syncing"; text?: string }
   | { kind: "ok"; text: string }
   | { kind: "error"; text: string };
 
@@ -87,10 +100,36 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
       // Une lecture complète a couvert tout l'historique : les détails (cœur, dénivelé) sont à jour.
       const complete = full || s.lastSync === null;
       setState((prev) => ({ ...prev, tokens, lastSync: Date.now(), seen: merged.seen, ...(complete ? { schema: STRAVA_SCHEMA } : {}) }));
-      setStatus({
-        kind: "ok",
-        text: syncMessage(merged.added, merged.enriched),
-      });
+      // Meilleurs efforts : lecture du détail des sorties les plus rapides, quelques requêtes par synchronisation.
+      let effortNote = "";
+      const todo = effortCandidates(merged.state.activities);
+      if (todo.length > 0) {
+        setStatus({ kind: "syncing", text: `Meilleurs efforts : 0/${todo.length}…` });
+        const res = await fetchEfforts(
+          tokens.accessToken,
+          todo.map((a) => stravaNumericId(a)!),
+          browserFetch,
+          (n, total) => setStatus({ kind: "syncing", text: `Meilleurs efforts : ${n}/${total}…` })
+        );
+        let activitiesNow = merged.state.activities;
+        if (res.efforts.size > 0) {
+          const byExternalId = new Map([...res.efforts].map(([id, e]) => [`strava:${id}`, e]));
+          // Le rendu de la fusion peut ne pas avoir eu lieu : on ne part des activités courantes que si elles la contiennent.
+          const live = latest.current.activities;
+          const base = merged.state.activities.every((a) => live.some((x) => x.id === a.id)) ? live : merged.state.activities;
+          activitiesNow = applyEfforts(base, byExternalId);
+          setActivities(activitiesNow);
+        }
+        const remaining = effortCandidates(activitiesNow, EFFORT_CANDIDATES_PER_DISTANCE, Infinity).length;
+        const analysed = res.efforts.size;
+        const parts: string[] = [];
+        if (analysed > 0) parts.push(analysed === 1 ? "1 sortie analysée pour les meilleurs efforts" : `${analysed} sorties analysées pour les meilleurs efforts`);
+        if (res.stopped?.kind === "quota") parts.push("quota Strava atteint, la suite sera lue à la prochaine synchro");
+        else if (res.stopped) parts.push(res.stopped.message);
+        else if (remaining > 0) parts.push(`${remaining} à analyser : relance la synchro`);
+        effortNote = parts.length > 0 ? ` ${parts.join(" ; ")}.` : "";
+      }
+      setStatus({ kind: "ok", text: syncMessage(merged.added, merged.enriched) + effortNote });
     } catch (e) {
       setStatus({ kind: "error", text: e instanceof StravaError ? e.message : "La synchronisation avec Strava a échoué." });
     } finally {
