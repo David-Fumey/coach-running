@@ -17,7 +17,8 @@
     "test:progress": "node --experimental-strip-types scripts/check-progress.ts",
     "test:records": "node --experimental-strip-types scripts/check-records.ts",
     "test:paces": "node --experimental-strip-types scripts/check-paces.ts",
-    "test:goal": "node --experimental-strip-types scripts/check-goal.ts"
+    "test:goal": "node --experimental-strip-types scripts/check-goal.ts",
+    "test:shift": "node --experimental-strip-types scripts/check-shift.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",

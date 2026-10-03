@@ -43,6 +43,8 @@ export interface Week {
   focus: string;
   totalKm: number;
   sessions: Session[];
+  /** Semaine de pause créée par un décalage du programme */
+  paused?: boolean;
 }
 
 export interface Plan {
