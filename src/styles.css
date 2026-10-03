@@ -351,6 +351,7 @@ button {
 
 .field input[type="date"],
 .field input[type="text"],
+.field input[type="password"],
 .field select {
   width: 100%;
   min-height: 2.875rem;
@@ -2122,4 +2123,43 @@ button {
   cursor: default;
   text-decoration: none;
   opacity: 0.6;
+}
+
+/* ---------- Strava ---------- */
+
+.syncbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+.syncbar__text {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.strava__form {
+  display: grid;
+  gap: 0.875rem;
+  width: 100%;
+}
+
+.strava__state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.strava__dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--accent);
 }

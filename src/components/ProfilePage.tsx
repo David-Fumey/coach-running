@@ -5,7 +5,9 @@ import { backupFileName } from "../lib/backup";
 import type { Profile } from "../lib/nutrition";
 import { fmtDate } from "../lib/format";
 import { todayISO } from "../storage";
+import type { StravaApi } from "../useStrava";
 import ProfileForm from "./ProfileForm";
+import StravaCard from "./StravaCard";
 
 interface Props {
   profile: Profile | null;
@@ -18,10 +20,11 @@ interface Props {
   /** Applique une sauvegarde ; retourne un message d'erreur ou null */
   onImport: (text: string) => string | null;
   onReset: () => void;
+  strava: StravaApi;
 }
 
 /** Page « Mon profil » : identité, morphologie, et gestion des données locales (sauvegarde en fichier). */
-export default function ProfilePage({ profile, plan, activityCount, foodCount, onSaveProfile, getBackup, onImport, onReset }: Props) {
+export default function ProfilePage({ profile, plan, activityCount, foodCount, onSaveProfile, getBackup, onImport, onReset, strava }: Props) {
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -72,6 +75,8 @@ export default function ProfilePage({ profile, plan, activityCount, foodCount, o
         </p>
       )}
 
+      <StravaCard strava={strava} />
+
       <section className="card" aria-labelledby="data-title">
         <h2 id="data-title" className="card__title">
           Mes données
@@ -109,7 +114,7 @@ export default function ProfilePage({ profile, plan, activityCount, foodCount, o
           type="button"
           className="link link--danger"
           onClick={() => {
-            if (window.confirm("Effacer définitivement le profil, le plan, les activités et le journal de cet appareil ?")) {
+            if (window.confirm("Effacer définitivement le profil, le plan, les activités, le journal et la connexion Strava de cet appareil ?")) {
               onReset();
             }
           }}

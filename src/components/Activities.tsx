@@ -3,6 +3,8 @@ import { diffDays, type Plan, type Session } from "../lib/plan";
 import { FEELINGS, byDateDesc, paceOf, parseMinutes, type Activity } from "../lib/activities";
 import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 import { todayISO } from "../storage";
+import type { StravaApi } from "../useStrava";
+import { fmtSync } from "./StravaCard";
 
 interface Props {
   plan: Plan;
@@ -13,9 +15,11 @@ interface Props {
   /** Sans id : création ; avec id : modification */
   onSave: (a: Omit<Activity, "id">, id?: string) => void;
   onDelete: (id: string) => void;
+  strava: StravaApi;
+  onOpenProfile: () => void;
 }
 
-export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete }: Props) {
+export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete, strava, onOpenProfile }: Props) {
   const today = todayISO();
   const sessions = plan.weeks.flatMap((w) => w.sessions);
   const byId = new Map(sessions.map((s) => [s.id, s]));
@@ -95,6 +99,27 @@ export default function Activities({ plan, done, activities, presetSessionId, on
 
   return (
     <div className="activities">
+      {strava.connected ? (
+        <div className="syncbar">
+          <p className="syncbar__text" role="status">
+            {strava.status.kind === "syncing"
+              ? "Synchronisation avec Strava…"
+              : strava.status.kind === "error"
+                ? strava.status.text
+                : strava.status.kind === "ok"
+                  ? strava.status.text
+                  : `Strava · dernière synchro : ${fmtSync(strava.state.lastSync)}`}
+          </p>
+          <button type="button" className="btn" disabled={strava.status.kind === "syncing"} onClick={strava.sync}>
+            Synchroniser
+          </button>
+        </div>
+      ) : (
+        <button type="button" className="link link--arrow" onClick={onOpenProfile}>
+          Importer automatiquement depuis ma montre Garmin (via Strava)
+        </button>
+      )}
+
       {!showForm && (
         <button type="button" className="btn btn--primary" onClick={() => setShowForm(true)}>
           Enregistrer une activité
@@ -179,7 +204,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                   <span className="activity__km">{fmtKm(a.km)} km</span>
                 </div>
                 <p className="activity__meta">
-                  {s ? s.title : "Sortie libre"} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
+                  {s ? s.title : "Sortie libre"}{a.source === "strava" ? " · Strava" : ""} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
                   {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
                 </p>
                 {a.note && <p className="hint">{a.note}</p>}

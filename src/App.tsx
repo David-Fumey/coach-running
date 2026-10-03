@@ -12,6 +12,7 @@ import Progress from "./components/Progress";
 import Nutrition from "./components/Nutrition";
 import ProfilePage from "./components/ProfilePage";
 import type { Food, Profile } from "./lib/nutrition";
+import { useStrava } from "./useStrava";
 import TabBar, { TABS, type Tab } from "./components/TabBar";
 
 export type PlanFormValues = Omit<PlanInput, "today">;
@@ -29,6 +30,15 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("accueil");
   /** Séance à pré-sélectionner dans l'onglet Activités (depuis l'accueil) */
   const [presetSession, setPresetSession] = useState<string | undefined>();
+  const strava = useStrava({
+    plan,
+    confirmed,
+    activities,
+    done,
+    setActivities,
+    setDone,
+    onReturn: () => setShowProfile(true),
+  });
 
   // Peut lever une erreur (date passée) : le formulaire l'affiche.
   function createPlan(values: PlanFormValues) {
@@ -36,6 +46,7 @@ export default function App() {
     setPlan(next);
     setDone({});
     setActivities([]);
+    strava.forgetHistory();
     setConfirmed(false);
     setTab("accueil");
     setEditing(false);
@@ -52,7 +63,13 @@ export default function App() {
 
   /** Sans `id` : nouvelle activité ; avec `id` : modification. */
   function saveActivity(a: Omit<Activity, "id">, id?: string) {
-    const activity: Activity = { ...a, id: id ?? `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
+    // Une activité importée garde son origine quand on la modifie : elle ne sera pas réimportée.
+    const origin = id ? activities.find((x) => x.id === id) : undefined;
+    const activity: Activity = {
+      ...a,
+      id: id ?? `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      ...(origin?.externalId ? { source: origin.source, externalId: origin.externalId } : {}),
+    };
     const next = id ? updateActivity({ activities, done }, activity) : addActivity({ activities, done }, activity);
     setActivities(next.activities);
     setDone(next.done);
@@ -74,6 +91,7 @@ export default function App() {
     setPlan(d.plan);
     setDone(d.done);
     setActivities(d.activities);
+    strava.forgetHistory();
     setConfirmed(d.confirmed);
     setProfile(d.profile);
     setFoods(d.foods);
@@ -126,8 +144,10 @@ export default function App() {
             onSaveProfile={setProfile}
             getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods }, new Date())}
             onImport={importData}
+            strava={strava}
             onReset={() => {
               applySnapshot(EMPTY_SNAPSHOT);
+              strava.reset();
               setShowProfile(false);
             }}
           />
@@ -199,6 +219,8 @@ export default function App() {
             presetSessionId={presetSession}
             onSave={saveActivity}
             onDelete={deleteActivity}
+            strava={strava}
+            onOpenProfile={openProfile}
           />
         )}
         {tab === "progres" && <Progress plan={plan} done={done} activities={activities} />}
