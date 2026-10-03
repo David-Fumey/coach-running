@@ -70,11 +70,14 @@ export default function Recipes({ plan, done, activities, profile, onAddFood }: 
         ) : null}
       </section>
 
-      <section className="card criteria" aria-labelledby="criteria-title">
+      <details className="card criteria criteria-fold" open>
+        <summary>
+          <h2 className="card__title">Mes critères</h2>
+          <span className="criteria-fold__preview">{summaryOf(criteria)}</span>
+        </summary>
+        <div className="criteria-fold__body">
         <div className="card__head">
-          <h2 id="criteria-title" className="card__title">
-            Mes critères
-          </h2>
+          <span className="hint">Les recettes suivent ces choix.</span>
           <button type="button" className="link" disabled={isDefault} onClick={() => setCriteria(DEFAULT_CRITERIA)}>
             Tout effacer
           </button>
@@ -114,7 +117,8 @@ export default function Recipes({ plan, done, activities, profile, onAddFood }: 
             </Chip>
           ))}
         </ChipGroup>
-      </section>
+        </div>
+      </details>
 
       <p className="recipes__count" role="status">
         {results.length === 0 ? "Aucune recette" : results.length === 1 ? "1 recette" : `${results.length} recettes`}
@@ -149,6 +153,16 @@ export default function Recipes({ plan, done, activities, profile, onAddFood }: 
       </p>
     </div>
   );
+}
+
+/** Résumé des critères actifs, affiché quand la carte est repliée. */
+function summaryOf(c: Criteria): string {
+  const parts: string[] = [];
+  if (c.moment !== "tous") parts.push(MOMENT_LABEL[c.moment]);
+  for (const d of c.diets) parts.push(DIET_LABEL[d]);
+  if (c.focus) parts.push(FOCUS_LABEL[c.focus]);
+  if (c.maxMinutes !== null) parts.push(`${c.maxMinutes} min max.`);
+  return parts.length > 0 ? parts.join(" · ") : "Aucun critère : toutes les recettes";
 }
 
 function ChipGroup({ label, children }: { label: string; children: React.ReactNode }) {

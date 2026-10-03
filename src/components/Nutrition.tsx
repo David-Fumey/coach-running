@@ -16,6 +16,8 @@ import { fmtDate, fmtDuration, fmtKm } from "../lib/format";
 import { todayISO } from "../storage";
 import Advice from "./Advice";
 import Recipes from "./Recipes";
+import Hydration from "./Hydration";
+import type { Water } from "../lib/hydration";
 import ProfileForm from "./ProfileForm";
 import { Ring } from "./icons";
 
@@ -29,20 +31,26 @@ interface Props {
   onOpenProfile: () => void;
   onAddFood: (f: Omit<Food, "id">) => void;
   onDeleteFood: (id: string) => void;
+  water: Water[];
+  onAddWater: (date: string, ml: number) => void;
+  onDeleteWater: (id: string) => void;
 }
 
 const KIND_SHORT: Record<DayKind, string> = { repos: "Repos", facile: "Facile", intense: "Intense", long: "Long", course: "Course" };
 
-type View = "jour" | "recettes" | "conseils";
+type View = "jour" | "hydratation" | "recettes" | "conseils";
 
 /** Onglet « Nutrition » : le suivi du jour d'un côté, les conseils de l'autre. */
 export default function Nutrition(props: Props) {
   const [view, setView] = useState<View>("jour");
   return (
     <div className="nutrition-tab">
-      <div className="segmented" role="group" aria-label="Section nutrition">
+      <div className="segmented segmented--4" role="group" aria-label="Section nutrition">
         <button type="button" aria-pressed={view === "jour"} onClick={() => setView("jour")}>
-          Suivi du jour
+          Suivi
+        </button>
+        <button type="button" aria-pressed={view === "hydratation"} onClick={() => setView("hydratation")}>
+          Hydratation
         </button>
         <button type="button" aria-pressed={view === "recettes"} onClick={() => setView("recettes")}>
           Recettes
@@ -52,6 +60,18 @@ export default function Nutrition(props: Props) {
         </button>
       </div>
       {view === "jour" && <Daily {...props} />}
+      {view === "hydratation" && (
+        <Hydration
+          plan={props.plan}
+          done={props.done}
+          activities={props.activities}
+          profile={props.profile}
+          water={props.water}
+          onAdd={props.onAddWater}
+          onDelete={props.onDeleteWater}
+          onOpenProfile={props.onOpenProfile}
+        />
+      )}
       {view === "recettes" && (
         <Recipes plan={props.plan} done={props.done} activities={props.activities} profile={props.profile} onAddFood={props.onAddFood} />
       )}

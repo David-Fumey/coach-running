@@ -3,6 +3,7 @@ import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
 import { canUndoShift, shiftPlan } from "./lib/shift";
+import type { Water } from "./lib/hydration";
 import { EMPTY_SNAPSHOT, makeBackup, parseBackup, type Snapshot } from "./lib/backup";
 import { addActivity, removeActivity, updateActivity, type Activity } from "./lib/activities";
 import { todayISO, useStoredState } from "./storage";
@@ -28,6 +29,7 @@ export default function App() {
   // Profil et journal alimentaire ne dépendent pas du plan : ils survivent à sa recréation.
   const [profile, setProfile] = useStoredState<Profile | null>("foulee.profile.v1", null);
   const [foods, setFoods] = useStoredState<Food[]>("foulee.foods.v1", []);
+  const [water, setWater] = useStoredState<Water[]>("foulee.water.v1", []);
   // Allure moyenne d'entraînement saisie à la main ; null = calculée sur les sorties enregistrées.
   const [paceRef, setPaceRef] = useStoredState<number | null>("foulee.pace.v1", null);
   // Temps objectif de course. Il appartient à une course : s'il ne correspond pas à celle du plan, il est ignoré.
@@ -117,6 +119,11 @@ export default function App() {
     setPlanBeforeShift(null);
   }
 
+  function addWater(date: string, ml: number) {
+    const id = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    setWater((prev) => [...prev, { id, date, ml }]);
+  }
+
   function applySnapshot(d: Snapshot) {
     setPlan(d.plan);
     setPlanBeforeShift(null);
@@ -126,6 +133,7 @@ export default function App() {
     setConfirmed(d.confirmed);
     setProfile(d.profile);
     setFoods(d.foods);
+    setWater(d.water);
     setPaceRef(d.paceRef);
     setGoal(d.goal);
     setEditing(false);
@@ -177,7 +185,7 @@ export default function App() {
             activityCount={activities.length}
             foodCount={foods.length}
             onSaveProfile={setProfile}
-            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal }, new Date())}
+            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water }, new Date())}
             onImport={importData}
             strava={strava}
             onReset={() => {
@@ -279,6 +287,9 @@ export default function App() {
             onOpenProfile={openProfile}
             onAddFood={addFood}
             onDeleteFood={(id) => setFoods((prev) => prev.filter((f) => f.id !== id))}
+            water={water}
+            onAddWater={addWater}
+            onDeleteWater={(id) => setWater((prev) => prev.filter((w) => w.id !== id))}
           />
         )}
       </main>
