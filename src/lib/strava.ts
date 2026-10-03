@@ -89,7 +89,7 @@ export function parseCallback(search: string, expectedState: string | null): Cal
   if (!expectedState || q.get("state") !== expectedState) return { kind: "error", message: "Retour de Strava inattendu : recommence la connexion." };
   if (error) return { kind: "error", message: "Strava a refusé la connexion (autorisation non accordée)." };
   if (!q.get("scope")?.split(",").includes("activity:read")) {
-    return { kind: "error", message: "Coche « Voir les données de tes activités » lors de l'autorisation, sinon Foulée ne peut pas lire tes courses." };
+    return { kind: "error", message: "Coche « Voir les données de tes activités » lors de l'autorisation, sinon Runner ne peut pas lire tes courses." };
   }
   return { kind: "code", code: code! };
 }
@@ -135,7 +135,7 @@ function withDetails(a: Activity, d: Details): Activity {
   return missing.length === 0 ? a : { ...a, ...Object.fromEntries(missing.map((k) => [k, d[k]])) };
 }
 
-/** Course Strava → activité Foulée, ou null si ce n'est pas une course exploitable. */
+/** Course Strava → activité Runner, ou null si ce n'est pas une course exploitable. */
 export function toActivity(r: StravaRun): Activity | null {
   if (!r || !Number.isFinite(r.id) || !isRun(r)) return null;
   if (!Number.isFinite(r.distance) || r.distance <= 0 || !Number.isFinite(r.moving_time) || r.moving_time <= 0) return null;

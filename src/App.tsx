@@ -225,7 +225,7 @@ export default function App() {
         <header className="topbar">
           <span className="topbar__brand">
             <img src="./icon.svg" alt="" width="28" height="28" />
-            Foulée
+            Runner
           </span>
           <button type="button" className="profile-btn" onClick={openProfile} aria-label="Mon profil">
             <span className="profile-btn__avatar" aria-hidden="true">

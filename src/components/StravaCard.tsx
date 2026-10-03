@@ -7,7 +7,7 @@ export function fmtSync(ms: number | null) {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(ms));
 }
 
-/** Connexion à Strava : les sorties de la montre Garmin y arrivent, Foulée les lit de là. */
+/** Connexion à Strava : les sorties de la montre Garmin y arrivent, Runner les lit de là. */
 export default function StravaCard({ strava }: { strava: StravaApi }) {
   const { state, status, connected } = strava;
   const [clientId, setClientId] = useState(state.clientId);
@@ -48,7 +48,7 @@ export default function StravaCard({ strava }: { strava: StravaApi }) {
           <button
             type="button"
             className="link link--danger"
-            onClick={() => window.confirm("Se déconnecter de Strava ? Les activités déjà importées restent dans Foulée.") && strava.disconnect()}
+            onClick={() => window.confirm("Se déconnecter de Strava ? Les activités déjà importées restent dans Runner.") && strava.disconnect()}
           >
             Se déconnecter de Strava
           </button>
@@ -56,7 +56,7 @@ export default function StravaCard({ strava }: { strava: StravaApi }) {
       ) : (
         <form className="strava__form" onSubmit={submit} noValidate>
           <p className="hint">
-            Ta montre Garmin envoie tes sorties vers Garmin Connect, qui peut les transmettre à Strava. Foulée lit ensuite tes courses sur Strava, sans passer par un serveur.
+            Ta montre Garmin envoie tes sorties vers Garmin Connect, qui peut les transmettre à Strava. Runner lit ensuite tes courses sur Strava, sans passer par un serveur.
           </p>
           <ol className="steps">
             <li>

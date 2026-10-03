@@ -1,5 +1,5 @@
 // Service worker minimal : met en cache l'application pour l'utiliser hors ligne.
-const CACHE = "foulee-v1";
+const CACHE = "runner-v1";
 
 self.addEventListener("install", () => self.skipWaiting());
 

@@ -30,7 +30,7 @@ const text = makeBackup(full, new Date("2026-10-05T10:00:00Z"));
 const back = parseBackup(text);
 check("aller-retour identique", back.ok && isDeepStrictEqual(back.data, full));
 check("sauvegarde vide", parseBackup(makeBackup(EMPTY_SNAPSHOT, new Date())).ok);
-check("nom de fichier", backupFileName("2026-10-05") === "foulee-2026-10-05.json");
+check("nom de fichier", backupFileName("2026-10-05") === "runner-2026-10-05.json");
 
 const err = (t: string) => {
   const r = parseBackup(t);

@@ -1,4 +1,6 @@
-# Foulée – contexte du projet
+# Runner – contexte du projet
+
+> L'application s'appelait Foulée avant d'être renommée Runner. Les identifiants techniques n'ont pas changé, pour ne perdre aucune donnée ni sauvegarde : clés `localStorage` en `foulee.*`, champ `app: "foulee"` des fichiers de sauvegarde. Les anciens journaux de session (`docs/sessions/`) gardent l'ancien nom.
 
 Application web (PWA) de coach de course à pied, inspirée de Runna. Interface en français.
 

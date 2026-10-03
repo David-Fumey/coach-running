@@ -71,7 +71,7 @@ const randomNonce = () => crypto.getRandomValues(new Uint32Array(4)).join("-");
 
 /**
  * Connexion à Strava et synchronisation des courses, sans serveur.
- * Garmin Connect envoie les sorties vers Strava ; Foulée les y lit à l'ouverture et à la demande.
+ * Garmin Connect envoie les sorties vers Strava ; Runner les y lit à l'ouverture et à la demande.
  */
 export function useStrava({ plan, confirmed, activities, done, setActivities, setDone, onReturn }: Args): StravaApi {
   const [state, setState] = useStoredState<StravaState>("foulee.strava.v1", EMPTY_STRAVA);

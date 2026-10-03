@@ -22,6 +22,7 @@ export interface Snapshot {
 
 export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null };
 
+/** Identifiant interne, resté « foulee » (ancien nom de l'application) pour que les anciennes sauvegardes restent lisibles. */
 const APP = "foulee";
 const VERSION = 1;
 
@@ -30,7 +31,7 @@ export function makeBackup(data: Snapshot, now: Date): string {
 }
 
 export function backupFileName(today: string): string {
-  return `foulee-${today}.json`;
+  return `runner-${today}.json`;
 }
 
 export type ParseResult = { ok: true; data: Snapshot } | { ok: false; error: string };
@@ -107,8 +108,8 @@ export function parseBackup(text: string): ParseResult {
   } catch {
     return { ok: false, error: "Ce fichier n'est pas un fichier JSON valide." };
   }
-  if (!isObj(raw) || raw.app !== APP || !isObj(raw.data)) return { ok: false, error: "Ce fichier ne vient pas de Foulée." };
-  if (!isNum(raw.version) || raw.version > VERSION) return { ok: false, error: "Ce fichier vient d'une version plus récente de Foulée." };
+  if (!isObj(raw) || raw.app !== APP || !isObj(raw.data)) return { ok: false, error: "Ce fichier ne vient pas de Runner." };
+  if (!isNum(raw.version) || raw.version > VERSION) return { ok: false, error: "Ce fichier vient d'une version plus récente de Runner." };
 
   const d = raw.data;
   const plan = d.plan ?? null;

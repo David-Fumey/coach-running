@@ -1,6 +1,6 @@
 {
-  "name": "Foulée – plan de course",
-  "short_name": "Foulée",
+  "name": "Runner – plan de course",
+  "short_name": "Runner",
   "description": "Ton plan d'entraînement de course à pied, semaine après semaine.",
   "lang": "fr",
   "start_url": "./",

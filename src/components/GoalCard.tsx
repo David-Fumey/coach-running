@@ -68,7 +68,7 @@ export default function GoalCard({ race, goal, model, onChange }: Props) {
               </span>
             </p>
           ) : (
-            <p className="hint">Enregistre quelques sorties (ou saisis ton allure moyenne plus bas) pour que Foulée compare cet objectif à ton niveau actuel.</p>
+            <p className="hint">Enregistre quelques sorties (ou saisis ton allure moyenne plus bas) pour que Runner compare cet objectif à ton niveau actuel.</p>
           )}
           <div className="actions">
             <button type="button" className="btn" onClick={() => setEditing(true)}>

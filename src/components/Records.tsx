@@ -115,7 +115,7 @@ export default function Records({ activities, today, scopeLabel }: Props) {
         )}
 
         <p className="hint">
-          Un record de distance vient soit d'une sortie proche de cette distance (de 2 % en dessous à 6 % au-dessus), soit du meilleur effort mesuré par Strava au sein d'une sortie plus longue. Le signe « ≈ » indique un temps ramené à la distance exacte. Foulée n'analyse que les sorties les plus rapides de chaque distance, quelques-unes à chaque synchronisation : les records peuvent encore s'améliorer pendant les premières synchronisations.
+          Un record de distance vient soit d'une sortie proche de cette distance (de 2 % en dessous à 6 % au-dessus), soit du meilleur effort mesuré par Strava au sein d'une sortie plus longue. Le signe « ≈ » indique un temps ramené à la distance exacte. Runner n'analyse que les sorties les plus rapides de chaque distance, quelques-unes à chaque synchronisation : les records peuvent encore s'améliorer pendant les premières synchronisations.
         </p>
       </div>
     </details>
