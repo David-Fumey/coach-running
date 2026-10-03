@@ -1,15 +1,15 @@
 // Records personnels calculés à partir des activités enregistrées. TypeScript pur.
 //
-// Limite assumée : une activité n'a ni tours ni temps intermédiaires. On ne sait donc pas
-// « le meilleur 5 km au sein d'une sortie de 12 km ». Un record de distance vient d'une sortie
-// dont la distance est proche de la distance visée (ni plus courte de 2 %, ni plus longue de 6 %) ;
-// son temps est ramené à la distance exacte.
+// Une activité n'a ni tours ni temps intermédiaires. Sans autre donnée, un record de distance vient donc
+// d'une sortie dont la distance est proche de la distance visée (ni plus courte de 2 %, ni plus longue
+// de 6 %) ; son temps est ramené à la distance exacte. Les meilleurs efforts mesurés par Strava au sein
+// d'une sortie plus longue (`Activity.efforts`) s'y ajoutent quand ils ont été importés.
 
 import { addDays, diffDays } from "./plan.ts";
 import { startOf } from "./progress.ts";
-import type { Activity } from "./activities.ts";
+import type { Activity, EffortKey } from "./activities.ts";
 
-export type TargetId = "5k" | "10k" | "semi" | "marathon";
+export type TargetId = EffortKey;
 
 export const TARGETS: { id: TargetId; label: string; km: number }[] = [
   { id: "5k", label: "5 km", km: 5 },
@@ -35,13 +35,15 @@ export interface Attempt {
   km: number;
   /** Faux si le temps a été ramené à la distance visée (sortie un peu plus longue ou plus courte) */
   exact: boolean;
+  /** Vrai si c'est un meilleur effort mesuré au sein de la sortie (km est alors la longueur de la sortie) */
+  fromEffort?: boolean;
 }
 
 export interface DistanceRecord {
   id: TargetId;
   label: string;
   km: number;
-  /** Nombre de sorties comptant pour cette distance */
+  /** Nombre de sorties comptant pour cette distance (efforts mesurés compris) */
   attempts: number;
   best: Attempt | null;
   /** Meilleur temps obtenu avant le record, null si c'est la première fois */
@@ -69,9 +71,24 @@ function fastest(list: Attempt[]): Attempt | null {
   return best;
 }
 
+/**
+ * Résultats comptant pour une distance : la sortie entière si elle est proche de cette distance, et/ou le meilleur
+ * effort mesuré dans la sortie. Une même sortie ne compte qu'une fois, avec son meilleur temps.
+ */
+export function attemptsOf(activities: Activity[], target: { id: TargetId; km: number }): Attempt[] {
+  const whole = new Map(attemptsFor(activities, target.km).map((a) => [a.activityId, a]));
+  for (const a of activities) {
+    const minutes = a.efforts?.[target.id];
+    if (minutes === undefined || !(minutes > 0)) continue;
+    const have = whole.get(a.id);
+    if (!have || minutes < have.minutes) whole.set(a.id, { activityId: a.id, date: a.date, minutes, km: a.km, exact: true, fromEffort: true });
+  }
+  return [...whole.values()];
+}
+
 export function distanceRecords(activities: Activity[]): DistanceRecord[] {
   return TARGETS.map((t) => {
-    const list = attemptsFor(activities, t.km);
+    const list = attemptsOf(activities, t);
     const best = fastest(list);
     const before = best ? fastest(list.filter((a) => a.date < best.date)) : null;
     return { id: t.id, label: t.label, km: t.km, attempts: list.length, best, previous: before ? before.minutes : null };

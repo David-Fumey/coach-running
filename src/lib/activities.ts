@@ -2,6 +2,11 @@
 
 import { addDays, diffDays, type Plan } from "./plan.ts";
 
+/** Distances dont on garde le meilleur effort au sein d'une sortie. */
+export type EffortKey = "5k" | "10k" | "semi" | "marathon";
+/** Meilleur temps (en minutes) sur chaque distance, à l'intérieur de la sortie. Objet vide : détail lu, aucun effort. */
+export type Efforts = Partial<Record<EffortKey, number>>;
+
 export interface Activity {
   id: string;
   /** AAAA-MM-JJ */
@@ -22,6 +27,8 @@ export interface Activity {
   maxHr?: number;
   /** Dénivelé positif en mètres (importé) */
   elevation?: number;
+  /** Meilleurs efforts de la sortie (importés ; absent tant que le détail n'a pas été lu) */
+  efforts?: Efforts;
 }
 
 export const FEELINGS: Record<number, string> = {

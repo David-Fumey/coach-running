@@ -2,11 +2,12 @@ import { generatePlan } from "../src/lib/plan.ts";
 import { addActivity, removeActivity, type Activity, type Tracked } from "../src/lib/activities.ts";
 import { makeBackup, parseBackup, EMPTY_SNAPSHOT } from "../src/lib/backup.ts";
 import {
-  EMPTY_STRAVA, authorizeUrl, mergeStrava, parseCallback, syncAfter, toActivity, tokensExpired,
+  EMPTY_STRAVA, applyEfforts, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
   type StravaRun, type StravaTokens,
 } from "../src/lib/strava.ts";
-import { StravaError, fetchRuns, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
+import { StravaError, fetchEfforts, fetchRuns, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
 
+const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
   if (!ok) {
@@ -67,6 +68,75 @@ check("course supprimée : ni réimportée ni complétée", afterDel.added === 0
 const userEdited: Tracked = { activities: [{ ...old.state.activities[0], km: 9, note: "ma note" }], done: {} };
 const keepEdits = mergeStrava(plan, userEdited, old.seen, [run(30, "2026-10-04", 8, 48, { average_heartrate: 150 })]);
 check("compléter ne touche pas aux modifications de l'utilisateur", keepEdits.state.activities[0].km === 9 && keepEdits.state.activities[0].note === "ma note" && keepEdits.state.activities[0].avgHr === 150);
+
+// ---------- Meilleurs efforts ----------
+const respE = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+const nearTo = (a: number, b: number, eps = 0.006) => Math.abs(a - b) < eps;
+const detail = {
+  best_efforts: [
+    { name: "400m", distance: 400, elapsed_time: 100 },
+    { name: "1k", distance: 1000, elapsed_time: 290 },
+    { name: "5k", distance: 5000, elapsed_time: 1485 },
+    { name: "10k", distance: 10000, elapsed_time: 3100 },
+    { name: "Half-Marathon", distance: 21097.5, elapsed_time: 6900 },
+  ],
+};
+const parsed = parseBestEfforts(detail);
+check("efforts lus par distance", near(parsed["5k"]!, 24.75) && nearTo(parsed["10k"]!, 3100 / 60) && near(parsed.semi!, 115) && parsed.marathon === undefined, parsed);
+check("distances intermédiaires ignorées", Object.keys(parsed).length === 3);
+check("distance à 1 % près acceptée, au-delà refusée", parseBestEfforts({ best_efforts: [{ distance: 5040, elapsed_time: 1500 }] })["5k"] !== undefined && parseBestEfforts({ best_efforts: [{ distance: 5100, elapsed_time: 1500 }] })["5k"] === undefined);
+check("le plus court temps est gardé", nearTo(parseBestEfforts({ best_efforts: [{ distance: 5000, elapsed_time: 1500 }, { distance: 5000, elapsed_time: 1400 }] })["5k"]!, 1400 / 60));
+check("réponse sans efforts ou mal formée : objet vide", Object.keys(parseBestEfforts({})).length === 0 && Object.keys(parseBestEfforts(null)).length === 0 && Object.keys(parseBestEfforts({ best_efforts: "x" })).length === 0 && Object.keys(parseBestEfforts({ best_efforts: [{ distance: 5000, elapsed_time: -4 }, { distance: "5000", elapsed_time: 100 }, null] })).length === 0);
+
+const mk = (n: number, km: number, minutes: number, extra: Partial<Activity> = {}): Activity => ({ id: `strava-${n}`, date: `2026-09-${String(n).padStart(2, "0")}`, km, minutes, externalId: `strava:${n}`, source: "strava", ...extra });
+check("identifiant Strava d'une activité", stravaNumericId(mk(7, 5, 30)) === 7 && stravaNumericId({ id: "m", date: "2026-09-01", km: 5, minutes: 30 }) === null);
+const pool: Activity[] = [
+  mk(1, 6, 36), mk(2, 8, 44), mk(3, 12, 66), mk(4, 7, 42), mk(5, 5.2, 32), mk(6, 4, 20), // 6 km/20 min = 5:00/km mais trop courte pour le 5 km
+  mk(7, 15, 90), mk(8, 10, 52), mk(9, 21, 130),
+  { id: "manual", date: "2026-09-20", km: 9, minutes: 40 }, // saisie à la main : pas d'identifiant Strava
+];
+const c3 = effortCandidates(pool, 3, 99);
+const c3ids = c3.map((a) => a.id).sort();
+check("candidats : les plus rapides en allure parmi les sorties assez longues", c3.every((a) => a.km >= 5) && c3.some((a) => a.id === "strava-8"), c3ids);
+check("candidats : jamais la sortie manuelle ni une sortie trop courte", !c3ids.includes("manual") && !c3ids.includes("strava-6"));
+check("candidats : pas de marathon sans sortie assez longue", effortCandidates(pool, 1, 99).every((a) => a.km < 42.195));
+const fetched = pool.map((a) => (a.id === "strava-8" ? { ...a, efforts: {} } : a));
+check("candidats : détail déjà lu exclu, mais il occupe sa place", !effortCandidates(fetched, 1, 99).some((a) => a.id === "strava-8") && effortCandidates(fetched, 1, 99).length < effortCandidates(pool, 1, 99).length + 1);
+check("candidats : plafonnés, les plus récents d'abord", effortCandidates(pool, 9, 2).length === 2 && effortCandidates(pool, 9, 2)[0].date >= effortCandidates(pool, 9, 2)[1].date);
+check("candidats : aucun sans activité", effortCandidates([], 6, 25).length === 0);
+
+const applied = applyEfforts(pool, new Map([["strava:8", { "5k": 24 }], ["strava:9", {}]]));
+check("efforts enregistrés sur la bonne activité", applied.find((a) => a.id === "strava-8")!.efforts!["5k"] === 24 && applied.find((a) => a.id === "strava-9")!.efforts !== undefined && applied.find((a) => a.id === "strava-1")!.efforts === undefined);
+const keep = applyEfforts(applied, new Map([["strava:8", { "5k": 1 }]]));
+check("des efforts déjà lus ne sont pas écrasés", keep.find((a) => a.id === "strava-8")!.efforts!["5k"] === 24);
+
+{
+  const urls: string[] = [];
+  const headers: (string | undefined)[] = [];
+  const progress: number[] = [];
+  const res = await fetchEfforts("tok", [1, 2, 3, 4, 5], async (u, init) => {
+    urls.push(u);
+    headers.push(init?.headers?.Authorization);
+    if (u.includes("/activities/1?")) return respE(200, detail);
+    if (u.includes("/activities/2?")) return respE(404, {});
+    if (u.includes("/activities/3?")) return respE(500, {});
+    return respE(429, {});
+  }, (done) => progress.push(done));
+  check("détail lu avec le jeton, sans tous les efforts", urls[0] === "https://www.strava.com/api/v3/activities/1?include_all_efforts=false" && headers[0] === "Bearer tok");
+  check("efforts rangés par identifiant", near(res.efforts.get(1)!["5k"]!, 24.75));
+  check("activité supprimée : marquée sans effort", Object.keys(res.efforts.get(2)!).length === 0);
+  check("erreur passagère : réessayée plus tard (pas marquée)", !res.efforts.has(3));
+  check("quota atteint : arrêt net, le reste n'est pas demandé", res.stopped?.kind === "quota" && urls.length === 4 && !res.efforts.has(4) && !res.efforts.has(5), urls);
+  check("progression signalée", progress.length >= 1);
+  const offline = await fetchEfforts("tok", [1, 2], async () => {
+    throw new Error("offline");
+  });
+  check("hors ligne : arrêt, rien de marqué", offline.stopped?.kind === "reseau" && offline.efforts.size === 0);
+  const refused = await fetchEfforts("tok", [1, 2], async () => respE(401, {}));
+  check("accès refusé : arrêt", refused.stopped?.kind === "autorisation");
+  const all = await fetchEfforts("tok", [1, 2], async () => respE(200, detail));
+  check("tout lu : pas d'arrêt", all.stopped === null && all.efforts.size === 2);
+}
 
 // ---------- Fusion ----------
 const m1 = mergeStrava(plan, empty, [], [run(100, s1.date, s1.km, 40)]);
@@ -184,6 +254,18 @@ const text = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: imported, done: m
 const back = parseBackup(text);
 check("la sauvegarde conserve l'origine Strava", back.ok && back.data.activities[0].externalId === "strava:100" && back.data.activities[0].source === "strava");
 check("la sauvegarde ne contient aucun secret", !text.includes("clientSecret") && !text.includes("refreshToken") && !text.includes("accessToken"));
+const withEfforts = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ ...imported[0], efforts: { "5k": 24.75, semi: 115 } }], done: {}, confirmed: true }, new Date());
+const effBack = parseBackup(withEfforts);
+check("la sauvegarde conserve les meilleurs efforts", effBack.ok && effBack.data.activities[0].efforts!["5k"] === 24.75 && effBack.data.activities[0].efforts!.semi === 115);
+const emptyEff = parseBackup(makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ ...imported[0], efforts: {} }], done: {}, confirmed: true }, new Date()));
+check("efforts vides conservés (détail lu, aucun effort)", emptyEff.ok && JSON.stringify(emptyEff.data.activities[0].efforts) === "{}");
+const badEff = JSON.parse(withEfforts);
+badEff.data.activities[0].efforts = { "3k": 10 };
+check("distance d'effort inconnue refusée", !parseBackup(JSON.stringify(badEff)).ok);
+badEff.data.activities[0].efforts = { "5k": -2 };
+check("temps d'effort négatif refusé", !parseBackup(JSON.stringify(badEff)).ok);
+badEff.data.activities[0].efforts = [1];
+check("efforts qui ne sont pas un objet refusés", !parseBackup(JSON.stringify(badEff)).ok);
 const bad = JSON.parse(text);
 bad.data.activities[0].externalId = 42;
 const richText = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ ...imported[0], avgHr: 150, maxHr: 175, elevation: 80 }], done: {}, confirmed: true }, new Date());

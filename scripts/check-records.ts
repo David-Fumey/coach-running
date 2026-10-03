@@ -1,5 +1,5 @@
 import type { Activity } from "../src/lib/activities.ts";
-import { attemptsFor, currentStreak, distanceRecords, highlights, isRecent, longestStreak } from "../src/lib/records.ts";
+import { attemptsFor, attemptsOf, currentStreak, distanceRecords, highlights, isRecent, longestStreak } from "../src/lib/records.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -39,6 +39,27 @@ check("un résultat plus lent ne change pas le record", slower.best!.activityId 
 const semi = distanceRecords([act("s", "2026-04-01", 21.1, 110)]).find((r) => r.id === "semi")!;
 check("semi-marathon à 21,1 km : compté", semi.best !== null && semi.best.exact);
 check("aucune activité : tout vide", distanceRecords([]).every((r) => r.best === null && r.attempts === 0 && r.previous === null));
+
+// ---------- Meilleurs efforts mesurés ----------
+const long5 = act("long", "2026-09-10", 12, 70, { efforts: { "5k": 22.5, "10k": 46 } }); // 5 km dans une sortie de 12 km
+const effList = [act("a1", "2026-03-01", 5.0, 26), long5];
+const rEff = distanceRecords(effList);
+const eff5 = rEff.find((r) => r.id === "5k")!;
+check("meilleur effort dans une sortie longue : nouveau record", eff5.best!.activityId === "long" && near(eff5.best!.minutes, 22.5) && eff5.best!.fromEffort === true && eff5.best!.km === 12, eff5.best);
+check("effort : temps exact, jamais « ramené »", eff5.best!.exact);
+check("effort : le record précédent reste la sortie de 5 km", near(eff5.previous!, 26));
+check("effort : 10 km aussi", near(rEff.find((r) => r.id === "10k")!.best!.minutes, 46) && rEff.find((r) => r.id === "10k")!.attempts === 1);
+check("distance sans effort ni sortie : aucun record", rEff.find((r) => r.id === "marathon")!.best === null);
+
+const both = act("both", "2026-09-12", 5.2, 26, { efforts: { "5k": 24.9 } }); // sortie entière ramenée = 25,0 ; effort 24,9
+const bothAttempts = attemptsOf([both], { id: "5k", km: 5 });
+check("une sortie ne compte qu'une fois, avec son meilleur temps", bothAttempts.length === 1 && near(bothAttempts[0].minutes, 24.9) && bothAttempts[0].fromEffort === true, bothAttempts);
+const worseEffort = act("w", "2026-09-12", 5.2, 26, { efforts: { "5k": 27 } }); // l'effort mesuré est plus lent que la sortie ramenée
+const keepWhole = attemptsOf([worseEffort], { id: "5k", km: 5 });
+check("effort plus lent que la sortie ramenée : on garde la sortie", keepWhole.length === 1 && near(keepWhole[0].minutes, (26 / 5.2) * 5) && !keepWhole[0].fromEffort);
+check("détail lu sans effort : rien en plus", attemptsOf([act("e", "2026-09-12", 12, 70, { efforts: {} })], { id: "5k", km: 5 }).length === 0);
+check("effort sur une sortie de 3 km impossible, valeur invalide ignorée", attemptsOf([act("z", "2026-09-12", 12, 70, { efforts: { "5k": 0 } })], { id: "5k", km: 5 }).length === 0);
+check("les efforts ne changent pas les autres repères", highlights([long5]).find((x) => x.id === "longest")!.value === 12);
 
 // ---------- Autres records ----------
 const mix: Activity[] = [

@@ -48,6 +48,12 @@ function validPlan(p: unknown): p is Plan {
   );
 }
 
+const EFFORT_KEYS = ["5k", "10k", "semi", "marathon"];
+
+function validEfforts(e: unknown): boolean {
+  return isObj(e) && Object.entries(e).every(([k, v]) => EFFORT_KEYS.includes(k) && isNum(v) && v > 0);
+}
+
 function validActivity(a: unknown): a is Activity {
   return (
     isObj(a) &&
@@ -60,7 +66,8 @@ function validActivity(a: unknown): a is Activity {
     (a.note === undefined || typeof a.note === "string") &&
     (a.source === undefined || typeof a.source === "string") &&
     (a.externalId === undefined || typeof a.externalId === "string") &&
-    isOptNum(a.avgHr) && isOptNum(a.maxHr) && isOptNum(a.elevation)
+    isOptNum(a.avgHr) && isOptNum(a.maxHr) && isOptNum(a.elevation) &&
+    (a.efforts === undefined || validEfforts(a.efforts))
   );
 }
 

@@ -2,7 +2,7 @@
 // voir `stravaClient.ts` pour le réseau. La réponse de Strava n'est jamais crue sur parole.
 
 import { type Plan } from "./plan.ts";
-import { addActivity, type Activity, type Tracked } from "./activities.ts";
+import { addActivity, type Activity, type Efforts, type EffortKey, type Tracked } from "./activities.ts";
 
 export interface StravaTokens {
   accessToken: string;
@@ -215,6 +215,69 @@ export function mergeStrava(plan: Plan, state: Tracked, seen: string[], runs: St
   }
 
   return { state: current, seen: [...seenSet], added, matched, enriched };
+}
+
+// ---------- Meilleurs efforts ----------
+
+/** Distances suivies, en mètres. */
+const EFFORT_METERS: Record<EffortKey, number> = { "5k": 5000, "10k": 10000, semi: 21097.5, marathon: 42195 };
+/** Un effort compte pour une distance s'il en est à 1 % près (les noms varient, la distance non). */
+const EFFORT_TOLERANCE = 0.01;
+/** Pour chaque distance, on interroge les sorties les plus rapides en allure moyenne. */
+export const EFFORT_CANDIDATES_PER_DISTANCE = 6;
+/** Nombre maximal de détails lus par synchronisation (les quotas de Strava sont de 100 requêtes par 15 minutes). */
+export const EFFORT_BATCH = 25;
+
+/** Lit `best_efforts` dans le détail d'une activité Strava. Objet vide si rien d'exploitable. */
+export function parseBestEfforts(raw: unknown): Efforts {
+  const out: Efforts = {};
+  const list = (raw as { best_efforts?: unknown } | null)?.best_efforts;
+  if (!Array.isArray(list)) return out;
+  for (const e of list as { distance?: unknown; elapsed_time?: unknown }[]) {
+    if (!e || typeof e.distance !== "number" || typeof e.elapsed_time !== "number" || e.elapsed_time <= 0) continue;
+    for (const key of Object.keys(EFFORT_METERS) as EffortKey[]) {
+      if (Math.abs(e.distance - EFFORT_METERS[key]) <= EFFORT_METERS[key] * EFFORT_TOLERANCE) {
+        const minutes = round2(e.elapsed_time / 60);
+        if (out[key] === undefined || minutes < out[key]!) out[key] = minutes;
+      }
+    }
+  }
+  return out;
+}
+
+/** Identifiant Strava d'une activité importée, ou null. */
+export function stravaNumericId(a: Activity): number | null {
+  const m = /^strava:(\d+)$/.exec(a.externalId ?? "");
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Activités dont il faut lire le détail pour connaître leurs meilleurs efforts.
+ * Un meilleur 5 km peut se cacher dans n'importe quelle sortie d'au moins 5 km, mais il y a peu de chances qu'il se
+ * trouve dans une sortie lente : pour chaque distance on retient les plus rapides en allure moyenne (parmi toutes
+ * celles qui sont assez longues, détail déjà lu ou non), puis on ne garde que celles dont le détail manque encore.
+ */
+export function effortCandidates(
+  activities: Activity[],
+  perDistance = EFFORT_CANDIDATES_PER_DISTANCE,
+  max = EFFORT_BATCH
+): Activity[] {
+  const chosen = new Map<string, Activity>();
+  for (const key of Object.keys(EFFORT_METERS) as EffortKey[]) {
+    const km = EFFORT_METERS[key] / 1000;
+    activities
+      .filter((a) => stravaNumericId(a) !== null && a.km >= km && a.minutes > 0)
+      .sort((a, b) => a.minutes / a.km - b.minutes / b.km || a.date.localeCompare(b.date))
+      .slice(0, perDistance)
+      .filter((a) => a.efforts === undefined)
+      .forEach((a) => chosen.set(a.id, a));
+  }
+  return [...chosen.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, max);
+}
+
+/** Enregistre les efforts lus (par identifiant externe) sans toucher au reste des activités. */
+export function applyEfforts(activities: Activity[], byExternalId: Map<string, Efforts>): Activity[] {
+  return activities.map((a) => (a.externalId && byExternalId.has(a.externalId) && a.efforts === undefined ? { ...a, efforts: byExternalId.get(a.externalId)! } : a));
 }
 
 /**

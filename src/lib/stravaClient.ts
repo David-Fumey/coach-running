@@ -1,7 +1,8 @@
 // Appels réseau vers Strava. Le CORS de Strava est ouvert : tout se fait depuis le navigateur, sans serveur.
 // `fetch` est injectable pour pouvoir tester sans réseau.
 
-import { tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
+import { parseBestEfforts, tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
+import type { Efforts } from "./activities.ts";
 
 export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   ok: boolean;
@@ -13,9 +14,12 @@ export type StravaErrorKind = "reseau" | "autorisation" | "quota" | "reponse";
 
 export class StravaError extends Error {
   kind: StravaErrorKind;
-  constructor(kind: StravaErrorKind, message: string) {
+  /** Code HTTP, quand l'erreur vient d'une réponse de Strava */
+  status?: number;
+  constructor(kind: StravaErrorKind, message: string, status?: number) {
     super(message);
     this.kind = kind;
+    this.status = status;
   }
 }
 
@@ -36,7 +40,7 @@ async function call(fetchFn: FetchLike, url: string, init?: Parameters<FetchLike
   if (res.status === 401 || res.status === 403) {
     throw new StravaError("autorisation", "Strava a refusé l'accès. Vérifie ton identifiant et ton secret, ou reconnecte-toi.");
   }
-  if (!res.ok) throw new StravaError("reponse", `Strava a répondu une erreur (${res.status}).`);
+  if (!res.ok) throw new StravaError("reponse", `Strava a répondu une erreur (${res.status}).`, res.status);
   try {
     return await res.json();
   } catch {
@@ -98,4 +102,42 @@ export async function fetchRuns(
 ): Promise<{ tokens: StravaTokens; runs: StravaRun[] }> {
   const fresh = tokensExpired(tokens, nowSec) ? await refreshTokens(cfg, tokens, fetchFn) : tokens;
   return { tokens: fresh, runs: await listActivities(fresh.accessToken, afterSec, fetchFn) };
+}
+
+const ACTIVITY_URL = "https://www.strava.com/api/v3/activities";
+
+export interface EffortsResult {
+  /** Efforts lus, par identifiant Strava (objet vide si l'activité n'en a aucun ou n'existe plus) */
+  efforts: Map<number, Efforts>;
+  /** Raison de l'arrêt avant la fin (quota, réseau, accès refusé), sinon null */
+  stopped: StravaError | null;
+}
+
+/**
+ * Lit le détail des activités indiquées, une par une, pour en tirer les meilleurs efforts.
+ * S'arrête proprement au premier quota atteint ou à la première coupure : ce qui est déjà lu reste acquis.
+ * Une activité introuvable (supprimée sur Strava) est marquée « sans effort » pour ne pas être redemandée.
+ */
+export async function fetchEfforts(
+  accessToken: string,
+  ids: number[],
+  fetchFn: FetchLike,
+  onProgress?: (done: number, total: number) => void
+): Promise<EffortsResult> {
+  const efforts = new Map<number, Efforts>();
+  for (const id of ids) {
+    try {
+      const body = await call(fetchFn, `${ACTIVITY_URL}/${id}?include_all_efforts=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      efforts.set(id, parseBestEfforts(body));
+    } catch (e) {
+      if (e instanceof StravaError && e.kind === "reponse") {
+        // 404 : activité supprimée, on n'y reviendra pas. Autre erreur : on réessaiera à la prochaine synchro.
+        if (e.status === 404) efforts.set(id, {});
+        continue;
+      }
+      return { efforts, stopped: e instanceof StravaError ? e : new StravaError("reseau", "Strava est injoignable. Vérifie ta connexion et réessaie.") };
+    }
+    onProgress?.(efforts.size, ids.length);
+  }
+  return { efforts, stopped: null };
 }
