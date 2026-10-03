@@ -15,6 +15,7 @@ import {
 import { fmtDate, fmtDuration, fmtKm } from "../lib/format";
 import { todayISO } from "../storage";
 import Advice from "./Advice";
+import Recipes from "./Recipes";
 import ProfileForm from "./ProfileForm";
 import { Ring } from "./icons";
 
@@ -32,7 +33,7 @@ interface Props {
 
 const KIND_SHORT: Record<DayKind, string> = { repos: "Repos", facile: "Facile", intense: "Intense", long: "Long", course: "Course" };
 
-type View = "jour" | "conseils";
+type View = "jour" | "recettes" | "conseils";
 
 /** Onglet « Nutrition » : le suivi du jour d'un côté, les conseils de l'autre. */
 export default function Nutrition(props: Props) {
@@ -43,15 +44,18 @@ export default function Nutrition(props: Props) {
         <button type="button" aria-pressed={view === "jour"} onClick={() => setView("jour")}>
           Suivi du jour
         </button>
+        <button type="button" aria-pressed={view === "recettes"} onClick={() => setView("recettes")}>
+          Recettes
+        </button>
         <button type="button" aria-pressed={view === "conseils"} onClick={() => setView("conseils")}>
           Conseils
         </button>
       </div>
-      {view === "jour" ? (
-        <Daily {...props} />
-      ) : (
-        <Advice plan={props.plan} profile={props.profile} onOpenProfile={props.onOpenProfile} />
+      {view === "jour" && <Daily {...props} />}
+      {view === "recettes" && (
+        <Recipes plan={props.plan} done={props.done} activities={props.activities} profile={props.profile} onAddFood={props.onAddFood} />
       )}
+      {view === "conseils" && <Advice plan={props.plan} profile={props.profile} onOpenProfile={props.onOpenProfile} />}
     </div>
   );
 }

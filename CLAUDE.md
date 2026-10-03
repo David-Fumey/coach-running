@@ -6,7 +6,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 
 1. Plan de course à pied sur plusieurs mois pour préparer une course (fait, v0.1), avec hub, activités et progrès (fait, v0.2).
 2. Suivi de la nutrition selon la charge d'entraînement (v0.3 : objectifs du jour et journal, fait).
-3. Partie « Conseils » selon les apports recherchés (v0.4 : fiches par apport et conseils par phase, fait).
+3. Partie « Conseils » selon les apports recherchés (v0.4 : fiches par apport et conseils par phase, fait) et recettes conseillées selon des critères (v0.5, fait).
 
 ## Stack
 
@@ -28,13 +28,14 @@ npm run test:activities  # vérifie activités et statistiques
 npm run test:nutrition   # vérifie les besoins nutritionnels et le journal
 npm run test:backup      # vérifie la sauvegarde / restauration en fichier
 npm run test:advice      # vérifie les fiches de conseils et leur personnalisation
+npm run test:recipes     # vérifie les recettes, les régimes calculés et les filtres
 ```
 
 ## Conventions
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts` ou `advice.ts` doit garder les cinq scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts` ou `recipes.ts` doit garder les six scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 
