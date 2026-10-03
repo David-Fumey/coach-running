@@ -38,3 +38,9 @@ export function fmtClock(minutes: number) {
   const p = (n: number) => String(n).padStart(2, "0");
   return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
 }
+
+/** 750 → « 750 ml », 1250 → « 1,25 L ». */
+export function fmtVolume(ml: number): string {
+  if (ml < 1000) return `${Math.round(ml)} ml`;
+  return `${String(Math.round(ml / 10) / 100).replace(".", ",")} L`;
+}

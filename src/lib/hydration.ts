@@ -3,6 +3,7 @@
 
 import { RUN_KCAL_PER_KG_KM, type Profile } from "./nutrition.ts";
 import type { Activity } from "./activities.ts";
+import { diffDays } from "./plan.ts";
 
 export interface Water {
   id: string;
@@ -225,4 +226,50 @@ export function calibration(weighings: Weighing[]): Calibration | null {
     trust,
     ratePerHour: Math.round(good.reduce((s, w) => s + sweatRate(w), 0) / good.length / 10) * 10,
   };
+}
+
+// ---------- Rappel après une sortie ----------
+
+/** En dessous de cette perte estimée, un rappel n'a pas d'intérêt. */
+export const MIN_REMINDER_ML = 300;
+/** Un rappel ne concerne que les sorties d'aujourd'hui et d'hier. */
+export const REMINDER_DAYS = 1;
+
+export interface PostRun {
+  activity: Activity;
+  loss: SweatEstimate;
+  conditions: Conditions;
+  /** Température relevée par la montre si c'est elle qui a fixé les conditions */
+  fromTemp: number | null;
+  /** Ce qu'il faut boire dans les 2 à 4 heures suivantes */
+  back: { low: number; high: number };
+}
+
+/**
+ * La sortie la plus récente pour laquelle afficher l'eau perdue estimée, ou null.
+ * Écartées : les sorties de plus d'un jour, déjà fermées par l'utilisateur, déjà pesées (la mesure suffit), ou trop courtes.
+ * Les conditions viennent de la température de la montre quand on l'a, sinon elles sont supposées tempérées.
+ */
+export function postRunLoss(
+  activities: Activity[],
+  weighings: Pick<Weighing, "date" | "km">[],
+  dismissed: string[],
+  today: string,
+  weightKg: number,
+  factor = 1
+): PostRun | null {
+  const recent = activities
+    .filter((a) => {
+      const age = diffDays(a.date, today);
+      return age >= 0 && age <= REMINDER_DAYS && !dismissed.includes(a.id) && !weighings.some((w) => w.date === a.date && Math.abs(w.km - a.km) < 0.05);
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  for (const activity of recent) {
+    const fromTemp = conditionsFromTemp(activity.temp);
+    const conditions = fromTemp ?? "temperee";
+    const loss = sweatLoss(activity.km, weightKg, conditions, factor);
+    if (loss.ml < MIN_REMINDER_ML) continue;
+    return { activity, loss, conditions, fromTemp: fromTemp ? (activity.temp as number) : null, back: replaceRange(loss.ml) };
+  }
+  return null;
 }

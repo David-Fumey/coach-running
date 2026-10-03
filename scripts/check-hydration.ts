@@ -1,7 +1,7 @@
 import type { Activity } from "../src/lib/activities.ts";
 import type { Profile } from "../src/lib/nutrition.ts";
 import {
-  CONDITIONS, DEFAULT_BASE_ML, calibration, conditionsFromTemp, hydrationTargetFromLoss, measuredLossMl, sweatRate, validateWeighing, weighingRatio, type Weighing, QUICK_AMOUNTS, baseMl, duringRange, hydrationTarget, lastActivity, progressOf, replaceRange, sweatLoss, totalMl, validAmount,
+  CONDITIONS, DEFAULT_BASE_ML, MIN_REMINDER_ML, postRunLoss, calibration, conditionsFromTemp, hydrationTargetFromLoss, measuredLossMl, sweatRate, validateWeighing, weighingRatio, type Weighing, QUICK_AMOUNTS, baseMl, duringRange, hydrationTarget, lastActivity, progressOf, replaceRange, sweatLoss, totalMl, validAmount,
 } from "../src/lib/hydration.ts";
 
 let failures = 0;
@@ -98,6 +98,32 @@ const acts: Activity[] = [
 check("dernière sortie : la plus récente, départagée par identifiant", lastActivity(acts, "2026-10-05")?.id === "x3");
 check("une sortie future est ignorée", lastActivity(acts, "2026-10-02")?.id === "x1");
 check("aucune sortie", lastActivity([], "2026-10-05") === null && lastActivity(acts, "2026-09-01") === null);
+
+// ---------- Rappel après une sortie ----------
+const today0 = "2026-10-05";
+const run = (id: string, date: string, km: number, extra: Partial<Activity> = {}): Activity => ({ id, date, km, minutes: km * 6, ...extra });
+const rp = (list: Activity[], opts: { weighed?: { date: string; km: number }[]; dismissed?: string[]; weight?: number; factor?: number } = {}) =>
+  postRunLoss(list, opts.weighed ?? [], opts.dismissed ?? [], today0, opts.weight ?? 70, opts.factor ?? 1);
+
+const todayRun = rp([run("a", today0, 10)])!;
+check("sortie du jour : perte estimée, conditions tempérées par défaut", todayRun.activity.id === "a" && todayRun.loss.ml === 770 && todayRun.conditions === "temperee" && todayRun.fromTemp === null, todayRun);
+check("à boire ensuite : 120 à 150 %", todayRun.back.low === 900 && todayRun.back.high === 1150, todayRun.back);
+check("la veille compte aussi", rp([run("b", "2026-10-04", 10)])?.activity.id === "b");
+check("deux jours plus tôt : plus de rappel", rp([run("c", "2026-10-03", 10)]) === null);
+check("sortie future ignorée", rp([run("f", "2026-10-06", 10)]) === null);
+const hot = rp([run("h", today0, 10, { temp: 26 })])!;
+check("température de la montre : conditions chaudes et valeur reprise", hot.conditions === "chaude" && hot.fromTemp === 26 && hot.loss.ml === 1040, hot);
+check("température fraîche", rp([run("k", today0, 10, { temp: 8 })])!.conditions === "fraiche");
+check("pas de capteur (null) : tempéré", rp([run("n", today0, 10, { temp: null })])!.conditions === "temperee");
+check("sortie déjà fermée : écartée", rp([run("d", today0, 10)], { dismissed: ["d"] }) === null);
+check("sortie déjà pesée : la mesure suffit", rp([run("w", today0, 10)], { weighed: [{ date: today0, km: 10.02 }] }) === null);
+check("pesée d'une autre sortie : sans effet", rp([run("w2", today0, 10)], { weighed: [{ date: today0, km: 6 }] })?.activity.id === "w2");
+check("sortie trop courte : pas de rappel", rp([run("s", today0, 1.5)]) === null && 1.5 * 70 * 1.1 < MIN_REMINDER_ML);
+check("la plus récente est retenue", rp([run("old", "2026-10-04", 12), run("new", today0, 8)])!.activity.id === "new");
+check("une sortie fermée laisse place à la précédente", rp([run("old", "2026-10-04", 12), run("new", today0, 8)], { dismissed: ["new"] })!.activity.id === "old");
+check("une sortie trop courte laisse place à une plus longue de la veille", rp([run("short", today0, 1), run("long", "2026-10-04", 12)])!.activity.id === "long");
+check("poids et ajustement personnel pris en compte", rp([run("p", today0, 10)], { weight: 60 })!.loss.ml === 660 && rp([run("p", today0, 10)], { factor: 1.2 })!.loss.ml === 920);
+check("aucune sortie", rp([]) === null);
 
 // ---------- Validation ----------
 check("quantité valide", validAmount(250) && validAmount(10) && validAmount(3000));
