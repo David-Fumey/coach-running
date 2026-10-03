@@ -7,9 +7,14 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:plan": "node --experimental-strip-types scripts/check-plan.ts"
+    "test:plan": "node --experimental-strip-types scripts/check-plan.ts",
+    "test:activities": "node --experimental-strip-types scripts/check-activities.ts",
+    "test:nutrition": "node --experimental-strip-types scripts/check-nutrition.ts",
+    "test:backup": "node --experimental-strip-types scripts/check-backup.ts"
   },
   "dependencies": {
+    "@fontsource-variable/source-sans-3": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
