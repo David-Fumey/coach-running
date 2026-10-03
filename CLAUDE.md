@@ -8,6 +8,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 2. Suivi de la nutrition selon la charge d'entraînement (v0.3 : objectifs du jour et journal, fait).
 3. Partie « Conseils » selon les apports recherchés (v0.4 : fiches par apport et conseils par phase, fait) et recettes conseillées selon des critères (v0.5, fait).
 4. Import automatique des sorties de la montre Garmin via Strava (v0.6 : fait, à essayer avec un vrai compte).
+5. Écran Progrès filtrable : programme actuel ou total, graphiques par semaine, mois ou année (v0.7, fait).
 
 ## Stack
 
@@ -31,6 +32,7 @@ npm run test:nutrition   # vérifie les besoins nutritionnels et le journal
 npm run test:backup      # vérifie la sauvegarde / restauration en fichier
 npm run test:advice      # vérifie les fiches de conseils et leur personnalisation
 npm run test:recipes     # vérifie les recettes, les régimes calculés et les filtres
+npm run test:progress    # vérifie le regroupement par semaine, mois, année et les portées
 npm run test:strava      # vérifie l'import Strava (conversion, fusion sans doublon, client réseau simulé)
 ```
 
@@ -38,7 +40,7 @@ npm run test:strava      # vérifie l'import Strava (conversion, fusion sans dou
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts` ou `recipes.ts` ou `strava.ts` doit garder les sept scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts` ou `recipes.ts` ou `strava.ts` ou `progress.ts` doit garder les huit scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 
