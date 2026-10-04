@@ -50,6 +50,7 @@ const INTENSITY_LABEL: Record<Intensity, string> = {
 };
 
 const INTENSITY_EFFORT: Partial<Record<Intensity, string>> = {
+  facile: "effort 3-4/10",
   soutenu: "effort 7/10, sans chronomètre",
   "5k": "effort 9/10",
   "10k": "effort 8/10",
@@ -59,6 +60,7 @@ const INTENSITY_EFFORT: Partial<Record<Intensity, string>> = {
 /** Déroulé enregistré avec la séance, ou celui qu'avaient les séances de qualité et de tempo avant le catalogue. */
 function workoutOf(plan: Plan, session: Session, phase: string): Workout | null {
   if (session.workout) return session.workout;
+  if (session.type === "long") return null; // ancienne sortie longue : traitée plus bas
   if (session.type === "quality") return legacyQualityWorkout(plan.input.race, phase as Parameters<typeof legacyQualityWorkout>[1], session.km);
   if (session.type === "tempo") return legacyTempoWorkout(session.km);
   return null;
@@ -120,7 +122,7 @@ export function workoutBlocks(plan: Plan, session: Session, model: PaceModel | n
     }
     const blocks: WorkoutBlock[] = [];
     if (structured.warmKm > 0) blocks.push({ id: "warmup", title: "Échauffement", tone: "warmup", repeat: 1, steps: [easy("Footing facile", structured.warmKm * 1000)] });
-    blocks.push({ id: "main", title: "Séance", tone: "main", repeat: uniform ? sets[0].times : 1, steps, ...(structured.note ? { note: structured.note } : {}) });
+    blocks.push({ id: "main", title: session.type === "long" ? "Sortie longue" : "Séance", tone: "main", repeat: uniform ? sets[0].times : 1, steps, ...(structured.note ? { note: structured.note } : {}) });
     if (structured.coolKm > 0) blocks.push({ id: "cooldown", title: "Retour au calme", tone: "cooldown", repeat: 1, steps: [easy("Footing facile", structured.coolKm * 1000)] });
     return blocks;
   }

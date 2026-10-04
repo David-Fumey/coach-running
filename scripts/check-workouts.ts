@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { generatePlan, type Plan, type PlanInput, type Session, type Week } from "../src/lib/plan.ts";
 import { paceModel } from "../src/lib/paces.ts";
 import { workoutBlocks } from "../src/lib/steps.ts";
-import { fmtMeters, fmtSeconds, legacyQualityWorkout, qualityWorkout, tempoWorkout, upgradePlan, upgradableCount } from "../src/lib/workouts.ts";
+import { fmtMeters, fmtSeconds, legacyQualityWorkout, longWorkout, qualityWorkout, tempoWorkout, upgradePlan, upgradableCount } from "../src/lib/workouts.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -101,11 +101,30 @@ check("ancien plan : toutes les séances ont toujours un déroulé", all(old).ev
 const legacy = legacyQualityWorkout("semi", "construction", 9);
 check("ancien fractionné : répétitions de 1 km à allure 10 km", legacy.sets[0].work.meters === 1000 && legacy.sets[0].work.intensity === "10k");
 
+// ---------- Sorties longues ----------
+const longs = (p: Plan) => all(p).filter(({ s }) => s.type === "long");
+const longFormats = (p: Plan, phase: Week["phase"]) => longs(p).filter(({ w }) => w.phase === phase && !w.isRecovery).map(({ s }) => s.workout!.format);
+check("sorties longues : jamais sans déroulé", longs(marathon).every(({ s }) => s.workout !== undefined && s.workout.warmKm === 0 && s.workout.coolKm === 0));
+check("sorties longues : la distance du déroulé = celle de la séance", [marathon, semi, tenK].every((p) => longs(p).every(({ s }) => s.workout!.sets.reduce((a, x) => a + x.times * (x.work.meters ?? 0), 0) === Math.round(s.km * 1000))), longs(marathon).map(({ s }) => [s.km, s.workout!.format]));
+check("sorties longues : semaines de récupération et d'affûtage toujours faciles", longs(marathon).filter(({ w }) => w.isRecovery || w.phase === "affutage").every(({ s }) => s.workout!.format === "longue-facile"));
+const allLongFormats = new Set(longs(marathon).map(({ s }) => s.workout!.format));
+check("marathon : au moins 5 formats de sortie longue différents", allLongFormats.size >= 5, [...allLongFormats]);
+check("spécifique marathon : fin à allure de course, puis alternance", longFormats(marathon, "specifique").slice(0, 2).join() === "longue-fin-course,longue-alternance", longFormats(marathon, "specifique"));
+check("construction : le facile domine, avec de la variété", longFormats(marathon, "construction").filter((f) => f === "longue-facile").length >= 2 && new Set(longFormats(marathon, "construction")).size >= 3, longFormats(marathon, "construction"));
+const lf = longWorkout("marathon", "specifique", 20, false, 0);
+check("fin à allure de course : 30 % des km à allure marathon", lf.workout.sets.length === 2 && lf.workout.sets[1].work.meters === 6000 && lf.workout.sets[1].work.intensity === "course", lf.workout.sets);
+const la = longWorkout("semi", "specifique", 18, false, 1);
+check("alternance : commence facile, alterne allure de course et facile, finit facile", la.workout.sets[0].work.intensity === "facile" && la.workout.sets.slice(1).some((x) => x.work.intensity === "course") && la.workout.sets[la.workout.sets.length - 1].work.intensity === "facile" && la.title === "Sortie longue en alternance", la.workout.sets);
+const lt = longWorkout("semi", "construction", 18, false, 5);
+check("blocs au seuil : 3 × 2 km au seuil, 1 km facile entre eux", lt.workout.format === "longue-seuil" && lt.workout.sets.filter((x) => x.work.intensity === "seuil").length === 3 && lt.workout.sets.filter((x) => x.work.intensity === "facile" && x.work.meters === 1000).length >= 2, lt.workout.sets);
+check("sortie longue courte : pas d'alternance ni de seuil", longWorkout("5k", "construction", 8, false, 3).workout.format === "longue-facile" && longWorkout("5k", "construction", 8, false, 5).workout.format === "longue-progressive");
+check("sortie longue : récupération = facile quel que soit le rang", [0, 1, 2, 3, 4, 5, 6].every((n) => longWorkout("semi", "construction", 16, true, n).workout.format === "longue-facile"));
+
 // ---------- Mise à jour d'un plan enregistré ----------
 const oldMarathon: Plan = JSON.parse(JSON.stringify(marathon));
 for (const { s } of all(oldMarathon)) delete s.workout;
-const oldCount = all(oldMarathon).filter(({ s }) => s.type === "quality" || s.type === "tempo").length;
-check("ancien plan : toutes les séances de qualité et de tempo sont à mettre à jour", upgradableCount(oldMarathon, {}, "2026-10-05") === oldCount && oldCount > 10);
+const oldCount = all(oldMarathon).filter(({ s }) => s.type === "quality" || s.type === "tempo" || s.type === "long").length;
+check("ancien plan : séances de qualité, de tempo et sorties longues sont à mettre à jour", upgradableCount(oldMarathon, {}, "2026-10-05") === oldCount && oldCount > 10);
 check("plan à jour : rien à mettre à jour", upgradableCount(marathon, {}, "2026-10-05") === 0);
 check("mise à jour d'un ancien plan = plan neuf", isDeepStrictEqual(upgradePlan(oldMarathon, {}, "2026-10-05"), marathon));
 const firstQ = all(oldMarathon).find(({ s }) => s.type === "quality")!.s;

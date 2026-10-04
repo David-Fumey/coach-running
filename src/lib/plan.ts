@@ -1,6 +1,6 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
-import { qualityWorkout, tempoWorkout } from "./workouts.ts";
+import { longWorkout, qualityWorkout, tempoWorkout } from "./workouts.ts";
 
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
 export type Level = "debutant" | "intermediaire" | "avance";
@@ -184,21 +184,6 @@ function slotTypes(daysPerWeek: number, level: Level): SessionType[] {
 // ---------- Contenu des séances ----------
 // Les séances de qualité et de tempo viennent du catalogue (workouts.ts).
 
-function longSession(race: RaceKey, phase: Phase, km: number, recovery: boolean): { title: string; details: string } {
-  const finish = Math.round(km * 0.3);
-  if (!recovery && phase === "specifique" && (race === "semi" || race === "marathon") && km >= 14) {
-    return {
-      title: "Sortie longue",
-      details: `Allure facile (effort 3-4/10), puis les ${finish} derniers km à allure ${race === "semi" ? "semi-marathon" : "marathon"}. Emporte de l'eau, et un gel ou des fruits secs si tu dépasses 1 h 15.`,
-    };
-  }
-  return {
-    title: "Sortie longue",
-    details:
-      "Allure facile et régulière (effort 3-4/10). Le but est de tenir la durée, pas d'aller vite. Bois régulièrement si la sortie dépasse 1 h.",
-  };
-}
-
 function easySession(withStrides: boolean): { title: string; details: string } {
   return {
     title: "Footing",
@@ -282,6 +267,7 @@ export function generatePlan(input: PlanInput): Plan {
   const weeks: Week[] = [];
   /** Rang des séances de qualité déjà créées, par phase, et des tempos : ils font tourner les formats. */
   const qualityRank = new Map<Phase, number>();
+  const longRank = new Map<Phase, number>();
   let tempoRank = 0;
 
   for (let w = 0; w < totalWeeks; w++) {
@@ -368,7 +354,7 @@ export function generatePlan(input: PlanInput): Plan {
         switch (type) {
           case "long":
             km = longKm;
-            content = longSession(race, phase, km, isRecovery);
+            content = longWorkout(race, phase, round05(km), isRecovery, longRank.get(phase) ?? 0);
             break;
           case "quality":
             km = qualityKm;
@@ -395,6 +381,7 @@ export function generatePlan(input: PlanInput): Plan {
       });
     }
 
+    if (!isRaceWeek && !isRecovery) longRank.set(phase, (longRank.get(phase) ?? 0) + 1);
     if (slots.includes("quality") && !isRaceWeek) qualityRank.set(phase, (qualityRank.get(phase) ?? 0) + 1);
 
     // Les séances déjà passées (début de plan en cours de semaine) sont ignorées.

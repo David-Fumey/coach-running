@@ -273,6 +273,15 @@ export function targetsFor(model: PaceModel, plan: Plan, session: Session, goal:
     return list.length > 0 ? { targets: list, comparable: false } : null;
   }
 
+  // Sortie longue du catalogue : facile seule (comparable), ou facile puis les allures de son déroulé.
+  if (session.type === "long" && session.workout) {
+    const easy = target("Allure facile", "facile");
+    const rest = timedIntensities(session.workout)
+      .map((i) => intensityTarget(model, plan, session, i, goal))
+      .filter((t): t is PaceTarget => t !== null);
+    return rest.length > 0 ? { targets: [easy, ...rest], comparable: false } : { targets: [easy], comparable: true };
+  }
+
   switch (session.type) {
     case "easy":
       return { targets: [target("Allure facile", "facile")], comparable: true };

@@ -5,7 +5,7 @@
 // ensuite l'affichage pas à pas. Le format change d'une séance à l'autre (rotation) et s'allonge d'un cycle à l'autre
 // (progression) ; le nombre de répétitions suit les kilomètres de la séance, donc le volume de la semaine.
 
-import type { Phase, Plan, RaceKey, Rest, Seg, Session, Workout, WorkSet } from "./plan.ts";
+import type { Intensity, Phase, Plan, RaceKey, Rest, Seg, Session, Workout, WorkSet } from "./plan.ts";
 
 export interface Built {
   title: string;
@@ -302,7 +302,7 @@ export function legacyTempoWorkout(km: number): Workout {
 // ---------- Mise à jour d'un plan enregistré ----------
 
 const upgradable = (s: Session, done: Record<string, boolean>, today: string) =>
-  (s.type === "quality" || s.type === "tempo") && !s.workout && s.date >= today && !done[s.id];
+  (s.type === "quality" || s.type === "tempo" || s.type === "long") && !s.workout && s.date >= today && !done[s.id];
 
 /** Nombre de séances à venir (qualité, tempo) qui n'ont pas encore le déroulé du catalogue. */
 export function upgradableCount(plan: Plan, done: Record<string, boolean>, today: string): number {
@@ -316,15 +316,19 @@ export function upgradableCount(plan: Plan, done: Record<string, boolean>, today
  */
 export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: string): Plan {
   const rank = new Map<Phase, number>();
+  const longRank = new Map<Phase, number>();
   let tempoRank = 0;
   const weeks = plan.weeks.map((w) => {
     const phaseRank = rank.get(w.phase) ?? 0;
     if (w.sessions.some((s) => s.type === "quality")) rank.set(w.phase, phaseRank + 1);
+    const longN = longRank.get(w.phase) ?? 0;
+    if (!w.isRecovery && w.sessions.some((s) => s.type === "long")) longRank.set(w.phase, longN + 1);
     return {
       ...w,
       sessions: w.sessions.map((s) => {
         let built: Built | null = null;
         if (s.type === "quality") built = upgradable(s, done, today) ? qualityWorkout(plan.input.race, w.phase, s.km, phaseRank) : null;
+        else if (s.type === "long") built = upgradable(s, done, today) ? longWorkout(plan.input.race, w.phase, s.km, w.isRecovery, longN) : null;
         else if (s.type === "tempo") {
           built = upgradable(s, done, today) ? tempoWorkout(s.km, tempoRank) : null;
           tempoRank++;
@@ -334,4 +338,104 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
     };
   });
   return { ...plan, weeks };
+}
+
+// ---------- Sorties longues ----------
+
+const r05 = (x: number) => Math.round(x * 2) / 2;
+const km = (x: number) => km1(x);
+const EASY_NOTE = "Emporte de l'eau, et un gel ou des fruits secs si tu dépasses 1 h 15.";
+const facile = (kmCount: number): WorkSet => ({ times: 1, work: { meters: Math.round(kmCount * 1000), intensity: "facile" } });
+const effortSet = (kmCount: number, intensity: Intensity): WorkSet => ({ times: 1, work: { meters: Math.round(kmCount * 1000), intensity } });
+
+function longPlain(kmTotal: number): Built {
+  return {
+    title: "Sortie longue",
+    details: "Allure facile et régulière (effort 3-4/10). Le but est de tenir la durée, pas d'aller vite. Bois régulièrement si la sortie dépasse 1 h.",
+    workout: { format: "longue-facile", warmKm: 0, coolKm: 0, sets: [facile(kmTotal)] },
+  };
+}
+
+function longRaceFinish(race: "semi" | "marathon", kmTotal: number): Built {
+  const finish = Math.round(kmTotal * 0.3);
+  return {
+    title: "Sortie longue",
+    details: `Allure facile (effort 3-4/10), puis les ${finish} derniers km à allure ${RACE_NAME[race]}. ${EASY_NOTE}`,
+    workout: { format: "longue-fin-course", warmKm: 0, coolKm: 0, sets: [facile(kmTotal - finish), effortSet(finish, "course")] },
+  };
+}
+
+function longProgressive(race: RaceKey, phase: Phase, kmTotal: number): Built {
+  const hard = Math.max(1, r05(kmTotal * 0.25));
+  const intensity: Intensity = phase === "specifique" && (race === "semi" || race === "marathon") ? "course" : "marathon";
+  const label = intensity === "course" ? `allure ${RACE_NAME[race]}` : "allure marathon";
+  return {
+    title: "Sortie longue progressive",
+    details: `${km(kmTotal - hard)} km à allure facile (effort 3-4/10), puis ${km(hard)} km en accélérant doucement jusqu'à ${label}. ${EASY_NOTE}`,
+    workout: { format: "longue-progressive", warmKm: 0, coolKm: 0, sets: [facile(kmTotal - hard), effortSet(hard, intensity)] },
+  };
+}
+
+function longAlternating(race: RaceKey, phase: Phase, kmTotal: number): Built {
+  const specific = phase === "specifique" && (race === "semi" || race === "marathon");
+  const block = specific ? 2 : 1;
+  const intensity: Intensity = specific ? "course" : "marathon";
+  const start = r05(kmTotal * 0.3);
+  const count = Math.floor((kmTotal - start) / (2 * block));
+  if (count < 2) return longProgressive(race, phase, kmTotal);
+  const sets: WorkSet[] = [facile(start)];
+  for (let i = 0; i < count; i++) sets.push(effortSet(block, intensity), facile(block));
+  const left = r05(kmTotal - start - 2 * block * count);
+  if (left > 0) sets.push(facile(left));
+  const label = specific ? `allure ${RACE_NAME[race]}` : "allure marathon";
+  return {
+    title: "Sortie longue en alternance",
+    details: `${km(start)} km à allure facile (effort 3-4/10), puis ${count} × (${km(block)} km à ${label} / ${km(block)} km facile)${left > 0 ? `, et ${km(left)} km ${left > 1 ? "faciles" : "facile"} pour finir` : ""}. ${EASY_NOTE}`,
+    workout: { format: "longue-alternance", warmKm: 0, coolKm: 0, sets },
+  };
+}
+
+function longThreshold(race: RaceKey, phase: Phase, kmTotal: number): Built {
+  const start = r05(kmTotal * 0.3);
+  let reps = kmTotal >= 18 ? 3 : 2;
+  while (reps > 1 && start + reps * 2 + (reps - 1) > kmTotal - 1) reps--;
+  if (reps < 2) return longProgressive(race, phase, kmTotal);
+  const sets: WorkSet[] = [facile(start)];
+  for (let i = 0; i < reps; i++) {
+    sets.push(effortSet(2, "seuil"));
+    if (i < reps - 1) sets.push(facile(1));
+  }
+  const left = r05(kmTotal - start - 2 * reps - (reps - 1));
+  if (left > 0) sets.push(facile(left));
+  return {
+    title: "Sortie longue avec blocs au seuil",
+    details: `${km(start)} km à allure facile (effort 3-4/10), puis ${reps} × 2 km au seuil (effort 7/10), 1 km facile entre les blocs${left > 0 ? `, et ${km(left)} km ${left > 1 ? "faciles" : "facile"} pour finir` : ""}. ${EASY_NOTE}`,
+    workout: { format: "longue-seuil", warmKm: 0, coolKm: 0, sets },
+  };
+}
+
+/**
+ * Sortie longue. `n` : rang parmi les sorties longues de la phase (hors semaines de récupération, toujours faciles).
+ * Le facile domine ; progressive, alternance et blocs au seuil reviennent de temps en temps quand la distance le permet.
+ */
+export function longWorkout(race: RaceKey, phase: Phase, kmTotal: number, recovery: boolean, n: number): Built {
+  if (recovery || phase === "affutage" || phase === "course") return longPlain(kmTotal);
+  if (phase === "base") return n % 3 === 2 && kmTotal >= 8 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
+  if (phase === "construction") {
+    switch (n % 6) {
+      case 1:
+        return kmTotal >= 8 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
+      case 3:
+        return kmTotal >= 12 ? longAlternating(race, phase, kmTotal) : longPlain(kmTotal);
+      case 5:
+        return kmTotal >= 12 ? longThreshold(race, phase, kmTotal) : longProgressive(race, phase, kmTotal);
+      default:
+        return longPlain(kmTotal);
+    }
+  }
+  if (race === "semi" || race === "marathon") {
+    if (kmTotal >= 14) return n % 2 === 0 ? longRaceFinish(race, kmTotal) : longAlternating(race, phase, kmTotal);
+    return n % 2 === 1 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
+  }
+  return n % 2 === 1 && kmTotal >= 8 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
 }
