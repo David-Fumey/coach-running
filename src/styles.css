@@ -4227,3 +4227,76 @@ body {
   text-decoration: line-through;
   opacity: 0.55;
 }
+
+/* ---------- Évolution des records ---------- */
+
+.record__history {
+  margin-top: 0.375rem;
+}
+
+.record__history summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--focus);
+}
+
+.rchart {
+  margin: 0.5rem 0 0;
+  max-width: 36rem;
+}
+
+.rchart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.rchart__grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.rchart text {
+  fill: var(--muted);
+  font-size: 9px;
+}
+
+.rchart__line {
+  fill: none;
+  stroke: var(--p-construction);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.rchart__pt circle:not(.rchart__hit) {
+  fill: var(--surface);
+  stroke: var(--p-construction);
+  stroke-width: 1.5;
+}
+
+.rchart__pt--record circle:not(.rchart__hit) {
+  fill: var(--p-construction);
+}
+
+.rchart__pt--sel circle:not(.rchart__hit) {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.rchart__hit {
+  fill: transparent;
+  stroke: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.rchart__caption {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.rchart__caption strong {
+  color: var(--ink);
+}

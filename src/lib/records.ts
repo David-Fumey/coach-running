@@ -95,6 +95,26 @@ export function distanceRecords(activities: Activity[]): DistanceRecord[] {
   });
 }
 
+/** Un résultat dans l'historique d'une distance. */
+export interface HistoryPoint extends Attempt {
+  /** Vrai si ce résultat bat strictement tous les précédents (nouveau record à cette date) */
+  record: boolean;
+}
+
+/**
+ * Évolution d'une distance dans le temps : tous les résultats par ordre de date, et ceux qui ont battu le record.
+ * À date égale, le plus rapide passe en premier, ce qui évite un faux « record » battu le même jour.
+ */
+export function recordHistory(activities: Activity[], target: { id: TargetId; km: number }): HistoryPoint[] {
+  const sorted = attemptsOf(activities, target).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.minutes - b.minutes));
+  let best = Infinity;
+  return sorted.map((a) => {
+    const record = a.minutes < best - 1e-9;
+    if (record) best = a.minutes;
+    return { ...a, record };
+  });
+}
+
 // ---------- Autres records ----------
 
 export type HighlightId = "longest" | "duration" | "pace" | "elevation" | "week" | "month" | "streak";

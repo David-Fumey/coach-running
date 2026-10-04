@@ -1,5 +1,5 @@
 import type { Activity } from "../src/lib/activities.ts";
-import { attemptsFor, attemptsOf, currentStreak, distanceRecords, highlights, isRecent, longestStreak } from "../src/lib/records.ts";
+import { attemptsFor, attemptsOf, currentStreak, recordHistory, distanceRecords, highlights, isRecent, longestStreak } from "../src/lib/records.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -101,5 +101,18 @@ check("deux sorties la même semaine : une seule semaine comptée", longestStrea
 check("récent : dans les 14 jours", isRecent("2026-10-10", "2026-10-20") && isRecent("2026-10-20", "2026-10-20"));
 check("pas récent : trop ancien ou futur", !isRecent("2026-09-01", "2026-10-20") && !isRecent("2026-10-25", "2026-10-20"));
 
+// ---------- Historique d'une distance ----------
+{
+  const t5 = { id: "5k" as const, km: 5 };
+  const hist = recordHistory([act("a1", "2026-03-01", 5.0, 26), act("a2", "2026-06-01", 5.0, 27), act("a3", "2026-08-01", 5.0, 25), act("a4", "2026-09-01", 5.0, 25), act("a5", "2026-09-01", 5.0, 24)], t5);
+  check("historique : ordre chronologique", hist.map((h) => h.activityId).join() === "a1,a2,a3,a5,a4", hist.map((h) => h.activityId));
+  check("historique : seuls les records successifs sont marqués", hist.map((h) => h.record).join() === "true,false,true,true,false", hist.map((h) => h.record));
+  check("historique : le premier résultat est un record", hist[0].record);
+  check("historique : une égalité ne bat pas le record", !hist.find((h) => h.activityId === "a4")!.record);
+  check("historique : vide sans sortie de la distance", recordHistory([act("l", "2026-01-01", 12, 70)], t5).length === 0);
+  check("historique : le dernier record est le meilleur temps", Math.min(...hist.map((h) => h.minutes)) === hist.filter((h) => h.record).at(-1)!.minutes);
+}
+
 console.log(failures === 0 ? "\nTout est bon." : `\n${failures} échec(s).`);
+
 process.exit(failures === 0 ? 0 : 1);

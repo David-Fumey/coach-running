@@ -1,5 +1,6 @@
 import type { Activity } from "../lib/activities";
-import { currentStreak, distanceRecords, highlights, isRecent, type Highlight } from "../lib/records";
+import { TARGETS, currentStreak, distanceRecords, highlights, isRecent, recordHistory, type Highlight } from "../lib/records";
+import RecordChart from "./RecordChart";
 import { fmtClock, fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 
 interface Props {
@@ -75,6 +76,12 @@ export default function Records({ activities, today, scopeLabel }: Props) {
                   {r.previous !== null && r.previous - r.best.minutes > 1 / 60 && <> · {fmtClock(r.previous - r.best.minutes)} de mieux que le record précédent</>}
                   {r.attempts > 1 && <> · {r.attempts} sorties</>}
                 </p>
+                {r.attempts > 1 && (
+                  <details className="record__history">
+                    <summary>Voir l'évolution</summary>
+                    <RecordChart points={recordHistory(activities, TARGETS.find((t) => t.id === r.id)!)} label={r.label} km={r.km} />
+                  </details>
+                )}
               </li>
             ) : (
               <li key={r.id} className="record record--empty">
