@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { generatePlan, type Plan, type PlanInput, type Session, type Week } from "../src/lib/plan.ts";
-import { paceModel } from "../src/lib/paces.ts";
+import { paceModel, targetsFor } from "../src/lib/paces.ts";
 import { workoutBlocks } from "../src/lib/steps.ts";
 import { fmtMeters, fmtSeconds, legacyQualityWorkout, longWorkout, qualityWorkout, tempoWorkout, upgradePlan, upgradableCount } from "../src/lib/workouts.ts";
 
@@ -119,6 +119,38 @@ const lt = longWorkout("semi", "construction", 18, false, 5);
 check("blocs au seuil : 3 × 2 km au seuil, 1 km facile entre eux", lt.workout.format === "longue-seuil" && lt.workout.sets.filter((x) => x.work.intensity === "seuil").length === 3 && lt.workout.sets.filter((x) => x.work.intensity === "facile" && x.work.meters === 1000).length >= 2, lt.workout.sets);
 check("sortie longue courte : pas d'alternance ni de seuil", longWorkout("5k", "construction", 8, false, 3).workout.format === "longue-facile" && longWorkout("5k", "construction", 8, false, 5).workout.format === "longue-progressive");
 check("sortie longue : récupération = facile quel que soit le rang", [0, 1, 2, 3, 4, 5, 6].every((n) => longWorkout("semi", "construction", 16, true, n).workout.format === "longue-facile"));
+
+// ---------- Niveaux ----------
+const beginner = generatePlan(input("10k", "2027-02-14", { level: "debutant", daysPerWeek: 4, currentWeeklyKm: 0 }));
+const walkSessions = all(beginner).filter(({ s }) => s.workout?.format === "course-marche");
+check("débutant qui court peu : les footings et la sortie longue des premières semaines sont en course/marche", walkSessions.length >= 12 && walkSessions.every(({ w }) => w.index < 8), walkSessions.length);
+const walkWeeksSet = new Set(walkSessions.map(({ w }) => w.index));
+check("course/marche : après quelques semaines, le footing se court d'un seul tenant", all(beginner).filter(({ s, w }) => s.type === "easy" && w.index >= Math.max(...walkWeeksSet) + 1).every(({ s }) => s.workout === undefined));
+const runSecs = [...walkWeeksSet].sort((a, b) => a - b).map((i) => Math.max(...walkSessions.filter(({ w }) => w.index === i).map(({ s }) => s.workout!.sets[0].work.seconds!)));
+check("course/marche : le temps de course s'allonge d'une semaine à l'autre", runSecs.every((x, i) => i === 0 || x >= runSecs[i - 1]) && runSecs[runSecs.length - 1] >= 8 * runSecs[0] / 2, runSecs);
+const rw = walkSessions[0].s.workout!;
+check("course/marche : 5 min de marche avant et après, marche entre les courses", rw.warm?.walk === true && rw.cool?.walk === true && rw.warm?.seconds === 300 && rw.sets[0].rest?.walk === true, rw);
+check("course/marche : la durée de la séance reste raisonnable (20 à 85 min)", walkSessions.every(({ s }) => { const w = s.workout!; const t = 600 + w.sets[0].times * (w.sets[0].work.seconds! + w.sets[0].rest!.seconds); return t >= 20 * 60 - 200 && t <= 85 * 60; }));
+const veteran = generatePlan(input("10k", "2027-02-14", { level: "debutant", daysPerWeek: 4, currentWeeklyKm: 20 }));
+check("débutant qui court déjà 20 km par semaine : pas de course/marche", all(veteran).every(({ s }) => s.workout?.format !== "course-marche" && s.workout?.format !== "fartlek-marche"));
+check("intermédiaire sans km saisis : pas de course/marche", all(generatePlan(input("10k", "2027-02-14", { currentWeeklyKm: 0 }))).every(({ s }) => s.workout?.format !== "course-marche"));
+check("fartlek des débutants : récupérations en marchant", beginner.weeks[0].sessions.some((s) => s.workout?.format === "fartlek-marche" && s.workout.sets[1].rest?.walk === true));
+const walkBlocks = workoutBlocks(beginner, walkSessions[0].s, model)!;
+check("course/marche : déroulé Échauffement, Séance, Retour au calme avec marche", walkBlocks.map((b) => b.id).join() === "warmup,main,cooldown" && walkBlocks[0].steps[0].kind === "walk" && walkBlocks[1].steps[0].label === "Course facile" && walkBlocks[1].steps[1].label === "Marche de récupération", walkBlocks.map((b) => b.steps[0]));
+check("course/marche : pas de comparaison d'allure (marche comprise)", targetsFor(model, beginner, walkSessions[0].s)!.comparable === false);
+check("débutant : jamais d'alternance ni de blocs au seuil en sortie longue", longs(generatePlan(input("marathon", "2027-04-04", { level: "debutant", currentWeeklyKm: 25 }))).every(({ s }) => s.workout!.format !== "longue-seuil" && s.workout!.format !== "longue-alternance"));
+const hardQ = (level: "debutant" | "intermediaire" | "avance") => quality(generatePlan(input("10k", "2027-02-14", { level, currentWeeklyKm: 25 }))).filter(({ s }) => s.workout!.format === "fractionne").map(({ s }) => s.workout!.sets[0].work.meters!);
+const dq = hardQ("debutant"), iq = hardQ("intermediaire"), aq = hardQ("avance");
+check("avancé : répétitions plus longues qu'un intermédiaire, qu'un débutant", Math.max(...aq) > Math.max(...iq) && Math.max(...iq) >= Math.max(...dq) && aq[0] > iq[0], { dq, iq, aq });
+const adv4 = generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: 4, currentWeeklyKm: 30 }));
+const mid4 = generatePlan(input("10k", "2027-02-14", { level: "intermediaire", daysPerWeek: 4, currentWeeklyKm: 30 }));
+const hardPerWeek = (p: Plan) => p.weeks.filter((w) => w.phase !== "course").map((w) => w.sessions.filter((s) => s.type === "quality" || s.type === "tempo").length);
+check("avancé sur 4 jours : deux séances de travail par semaine, un intermédiaire une seule", hardPerWeek(adv4).slice(0, -1).every((n) => n === 2) && hardPerWeek(mid4).every((n) => n <= 1), [hardPerWeek(adv4), hardPerWeek(mid4)]);
+check("avancé sur 4 jours : aucune séance plus longue que la sortie longue", adv4.weeks.every((w) => w.sessions.every((s) => s.type === "long" || w.sessions.find((x) => x.type === "long") === undefined || s.km <= w.sessions.find((x) => x.type === "long")!.km + 0.5)));
+const walkPlanOld: Plan = JSON.parse(JSON.stringify(beginner));
+for (const { s } of all(walkPlanOld)) delete s.workout;
+check("ancien plan de débutant : la mise à jour donne le plan neuf", isDeepStrictEqual(upgradePlan(walkPlanOld, {}, "2026-10-05"), beginner));
+check("ancien plan de débutant : les footings de course/marche sont à mettre à jour", upgradableCount(walkPlanOld, {}, "2026-10-05") > upgradableCount(beginner, {}, "2026-10-05") && upgradableCount(beginner, {}, "2026-10-05") === 0);
 
 // ---------- Mise à jour d'un plan enregistré ----------
 const oldMarathon: Plan = JSON.parse(JSON.stringify(marathon));

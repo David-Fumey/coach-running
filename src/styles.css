@@ -3360,6 +3360,14 @@ button {
   border-left: 4px solid var(--t-easy);
 }
 
+.wo-step--walk {
+  border-left: 4px solid var(--line-strong);
+}
+
+.wo-step--walk .wo-step__kind {
+  color: var(--muted);
+}
+
 .wo-step--stride {
   border-left: 4px solid var(--p-construction);
 }

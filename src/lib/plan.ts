@@ -1,6 +1,6 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
-import { longWorkout, qualityWorkout, tempoWorkout } from "./workouts.ts";
+import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout } from "./workouts.ts";
 
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
 export type Level = "debutant" | "intermediaire" | "avance";
@@ -37,6 +37,8 @@ export interface Seg {
   seconds?: number;
   intensity: Intensity;
   hill?: boolean;
+  /** Marche plutôt que course */
+  walk?: boolean;
 }
 
 export interface Rest {
@@ -57,6 +59,9 @@ export interface Workout {
   format: string;
   warmKm: number;
   coolKm: number;
+  /** Échauffement et retour au calme chronométrés (marche), à la place de `warmKm` et `coolKm` */
+  warm?: Seg;
+  cool?: Seg;
   sets: WorkSet[];
   note?: string;
 }
@@ -173,7 +178,8 @@ function slotTypes(daysPerWeek: number, level: Level): SessionType[] {
     case 3:
       return ["quality", "easy", "long"];
     case 4:
-      return ["quality", "easy", "easy", "long"];
+      // Les avancés ont deux séances de travail par semaine, en plus de la sortie longue.
+      return level === "avance" ? ["quality", "tempo", "easy", "long"] : ["quality", "easy", "easy", "long"];
     case 5:
       return ["easy", "quality", second, "easy", "long"];
     default:
@@ -269,6 +275,9 @@ export function generatePlan(input: PlanInput): Plan {
   const qualityRank = new Map<Phase, number>();
   const longRank = new Map<Phase, number>();
   let tempoRank = 0;
+  // Débutant qui court peu : les premières semaines alternent course et marche, de plus en plus de course.
+  const runWalk = needsRunWalk(input);
+  const walkWeeks = runWalkWeeks(trainingWeeks);
 
   for (let w = 0; w < totalWeeks; w++) {
     const weekStart = addDays(start, w * 7);
@@ -332,7 +341,7 @@ export function generatePlan(input: PlanInput): Plan {
     } else {
       const longKm = clamp(Math.min(volume * LONG_SHARE[race], LONG_CAP[race]), 3, volume * 0.5);
       const qualityKm = Math.max(4, volume * (daysPerWeek >= 4 ? 0.2 : 0.25));
-      const tempoKm = Math.max(4, volume * 0.15);
+      const tempoKm = Math.max(4, volume * (level === "avance" && daysPerWeek === 4 ? 0.2 : 0.15));
       const recKm = Math.max(3, volume * 0.08);
 
       const fixed = slots.reduce((acc, t) => {
@@ -346,6 +355,8 @@ export function generatePlan(input: PlanInput): Plan {
       const easyKm = Math.max(3, (volume - fixed) / Math.max(1, easyCount));
 
       let firstEasy = true;
+      const walking = runWalk && w < walkWeeks;
+      const stage = runWalkStage(w, walkWeeks);
       const phaseRank = qualityRank.get(phase) ?? 0;
       slots.forEach((type, i) => {
         const date = addDays(weekStart, days[i]);
@@ -354,27 +365,29 @@ export function generatePlan(input: PlanInput): Plan {
         switch (type) {
           case "long":
             km = longKm;
-            content = longWorkout(race, phase, round05(km), isRecovery, longRank.get(phase) ?? 0);
+            content = walking ? runWalkWorkout(round05(km), stage + 1, true) : longWorkout(race, phase, round05(km), isRecovery, longRank.get(phase) ?? 0, level);
             break;
           case "quality":
             km = qualityKm;
-            content = qualityWorkout(race, phase, round05(km), phaseRank);
+            content = walking ? fartlekWalk(round05(km)) : qualityWorkout(race, phase, round05(km), phaseRank, level);
             break;
           case "tempo":
             km = tempoKm;
-            content = tempoWorkout(round05(km), tempoRank);
+            content = tempoWorkout(round05(km), tempoRank, level);
             tempoRank++;
             break;
           case "recovery":
             km = recKm;
-            content = {
-              title: "Footing de récupération",
-              details: "Très lent (effort 2-3/10). Cette séance sert à digérer la charge, pas à progresser.",
-            };
+            content = walking
+              ? runWalkWorkout(round05(km), stage, false)
+              : {
+                  title: "Footing de récupération",
+                  details: "Très lent (effort 2-3/10). Cette séance sert à digérer la charge, pas à progresser.",
+                };
             break;
           default:
             km = easyKm;
-            content = easySession(firstEasy && level !== "debutant" && phase !== "base");
+            content = walking ? runWalkWorkout(round05(km), stage, false) : easySession(firstEasy && level !== "debutant" && phase !== "base");
             firstEasy = false;
         }
         sessions.push({ id: `s-${date}`, date, type, km: round05(km), ...content });

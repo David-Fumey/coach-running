@@ -6,7 +6,7 @@ import type { Intensity, Plan, RaceKey, Seg, Session, Workout } from "./plan.ts"
 import { intensityTarget, targetsFor, zoneRange, type PaceModel, type PaceRange } from "./paces.ts";
 import { legacyQualityWorkout, legacyTempoWorkout } from "./workouts.ts";
 
-export type StepKind = "easy" | "work" | "rest" | "stride";
+export type StepKind = "easy" | "work" | "rest" | "stride" | "walk";
 export type BlockTone = "warmup" | "main" | "cooldown" | "strides";
 
 export interface WorkoutStep {
@@ -91,14 +91,17 @@ export function workoutBlocks(plan: Plan, session: Session, model: PaceModel | n
   const structured = workoutOf(plan, session, phase);
   if (structured) {
     const label = (i: Intensity) => (i === "course" ? `Allure ${RACE_LABEL[race]}` : i === "coursePlus" ? `Allure ${RACE_LABEL[race]} ou plus vite` : INTENSITY_LABEL[i]);
+    const walkStep = (seg: Seg): WorkoutStep => ({ kind: "walk", label: "Marche rapide", seconds: seg.seconds, effort: "marche active, bras actifs" });
+    const runWalk = structured.format === "course-marche" || structured.format === "fartlek-marche";
     const workStep = (seg: Seg): WorkoutStep => {
       const size: Partial<WorkoutStep> = seg.meters !== undefined ? { distanceM: seg.meters } : { seconds: seg.seconds };
+      if (seg.walk) return walkStep(seg);
       if (seg.hill) return { kind: "work", label: "Montée en côte", ...size, paceMode: "fourchette", effort: "effort 8/10, pente de 4 à 6 %" };
       const pace = model ? intensityTarget(model, plan, session, seg.intensity) ?? undefined : undefined;
       const effort = INTENSITY_EFFORT[seg.intensity];
       return {
         kind: seg.intensity === "facile" ? "easy" : "work",
-        label: label(seg.intensity),
+        label: runWalk && seg.intensity === "facile" ? "Course facile" : label(seg.intensity),
         ...size,
         pace,
         paceMode: "fourchette",
@@ -121,9 +124,11 @@ export function workoutBlocks(plan: Plan, session: Session, model: PaceModel | n
       }
     }
     const blocks: WorkoutBlock[] = [];
-    if (structured.warmKm > 0) blocks.push({ id: "warmup", title: "Échauffement", tone: "warmup", repeat: 1, steps: [easy("Footing facile", structured.warmKm * 1000)] });
-    blocks.push({ id: "main", title: session.type === "long" ? "Sortie longue" : "Séance", tone: "main", repeat: uniform ? sets[0].times : 1, steps, ...(structured.note ? { note: structured.note } : {}) });
-    if (structured.coolKm > 0) blocks.push({ id: "cooldown", title: "Retour au calme", tone: "cooldown", repeat: 1, steps: [easy("Footing facile", structured.coolKm * 1000)] });
+    if (structured.warm) blocks.push({ id: "warmup", title: "Échauffement", tone: "warmup", repeat: 1, steps: [workStep(structured.warm)] });
+    else if (structured.warmKm > 0) blocks.push({ id: "warmup", title: "Échauffement", tone: "warmup", repeat: 1, steps: [easy("Footing facile", structured.warmKm * 1000)] });
+    blocks.push({ id: "main", title: session.type === "long" ? "Sortie longue" : structured.format === "course-marche" ? "Course/marche" : "Séance", tone: "main", repeat: uniform ? sets[0].times : 1, steps, ...(structured.note ? { note: structured.note } : {}) });
+    if (structured.cool) blocks.push({ id: "cooldown", title: "Retour au calme", tone: "cooldown", repeat: 1, steps: [workStep(structured.cool)] });
+    else if (structured.coolKm > 0) blocks.push({ id: "cooldown", title: "Retour au calme", tone: "cooldown", repeat: 1, steps: [easy("Footing facile", structured.coolKm * 1000)] });
     return blocks;
   }
 

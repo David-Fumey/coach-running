@@ -5,7 +5,7 @@
 // ensuite l'affichage pas à pas. Le format change d'une séance à l'autre (rotation) et s'allonge d'un cycle à l'autre
 // (progression) ; le nombre de répétitions suit les kilomètres de la séance, donc le volume de la semaine.
 
-import type { Intensity, Phase, Plan, RaceKey, Rest, Seg, Session, Workout, WorkSet } from "./plan.ts";
+import type { Intensity, Level, Phase, Plan, PlanInput, RaceKey, Rest, Seg, Session, Workout, WorkSet } from "./plan.ts";
 
 export interface Built {
   title: string;
@@ -38,6 +38,14 @@ const uniform = (times: number, work: Seg, rest: Rest): WorkSet[] => [{ times, w
 
 /** Récupération entre deux efforts de la longueur donnée (m) : plus l'effort est long, plus elle l'est. */
 const restForMeters = (m: number): number => (m <= 300 ? 60 : m <= 600 ? 90 : m <= 1200 ? 120 : 150);
+
+/**
+ * Niveau du coureur : un avancé démarre un cran plus loin dans la progression des répétitions, un débutant
+ * s'arrête au deuxième cran.
+ */
+export function levelCycle(level: Level, cycle: number): number {
+  return level === "avance" ? cycle + 1 : level === "debutant" ? Math.min(cycle, 1) : cycle;
+}
 
 // ---------- Séances de qualité ----------
 
@@ -211,9 +219,10 @@ function taperReps(race: RaceKey, km: number): Built {
  * Séance de qualité. `n` : rang de cette séance parmi celles de la phase (0 pour la première), qui fait tourner les
  * formats puis allonge les répétitions au tour suivant.
  */
-export function qualityWorkout(race: RaceKey, phase: Phase, km: number, n: number): Built {
+export function qualityWorkout(race: RaceKey, phase: Phase, km: number, n: number, level: Level = "intermediaire"): Built {
+  const lv = (cycle: number) => levelCycle(level, cycle);
   if (phase === "base") {
-    const cycle = Math.floor(n / 3);
+    const cycle = lv(Math.floor(n / 3));
     switch (n % 3) {
       case 0:
         return fartlek(km);
@@ -225,7 +234,7 @@ export function qualityWorkout(race: RaceKey, phase: Phase, km: number, n: numbe
   }
   if (phase === "specifique") {
     if (race === "semi" || race === "marathon") {
-      const cycle = Math.floor(n / 3);
+      const cycle = lv(Math.floor(n / 3));
       switch (n % 3) {
         case 0:
           return raceBlocks(race, km);
@@ -235,11 +244,11 @@ export function qualityWorkout(race: RaceKey, phase: Phase, km: number, n: numbe
           return progressive(race, km);
       }
     }
-    const cycle = Math.floor(n / 2);
+    const cycle = lv(Math.floor(n / 2));
     return n % 2 === 0 ? racePaceReps(race, km, cycle) : sharpIntervals(km);
   }
   if (phase === "construction") {
-    const cycle = Math.floor(n / 3);
+    const cycle = lv(Math.floor(n / 3));
     switch (n % 3) {
       case 0:
         return intervals(race, km, cycle);
@@ -276,8 +285,8 @@ function cruiseIntervals(km: number, cycle: number): Built {
 }
 
 /** Séance du créneau « tempo » : un bloc continu, puis des intervalles au seuil, en alternance. */
-export function tempoWorkout(km: number, n: number): Built {
-  return n % 2 === 0 ? continuousTempo(km) : cruiseIntervals(km, Math.floor(n / 2));
+export function tempoWorkout(km: number, n: number, level: Level = "intermediaire"): Built {
+  return n % 2 === 0 ? continuousTempo(km) : cruiseIntervals(km, levelCycle(level, Math.floor(n / 2)));
 }
 
 // ---------- Plans enregistrés avant le catalogue ----------
@@ -301,12 +310,20 @@ export function legacyTempoWorkout(km: number): Workout {
 
 // ---------- Mise à jour d'un plan enregistré ----------
 
-const upgradable = (s: Session, done: Record<string, boolean>, today: string) =>
-  (s.type === "quality" || s.type === "tempo" || s.type === "long") && !s.workout && s.date >= today && !done[s.id];
+const upgradable = (s: Session, done: Record<string, boolean>, today: string, walking = false) =>
+  (s.type === "quality" || s.type === "tempo" || s.type === "long" || (walking && (s.type === "easy" || s.type === "recovery"))) &&
+  !s.workout &&
+  s.date >= today &&
+  !done[s.id];
+
+/** Semaines d'entraînement du plan (hors affûtage et course) : elles fixent la durée du course/marche. */
+const trainingWeeksOf = (plan: Plan) => plan.weeks.filter((w) => w.phase !== "affutage" && w.phase !== "course").length;
 
 /** Nombre de séances à venir (qualité, tempo) qui n'ont pas encore le déroulé du catalogue. */
 export function upgradableCount(plan: Plan, done: Record<string, boolean>, today: string): number {
-  return plan.weeks.reduce((n, w) => n + w.sessions.filter((s) => upgradable(s, done, today)).length, 0);
+  const runWalk = needsRunWalk(plan.input);
+  const walkWeeks = runWalkWeeks(trainingWeeksOf(plan));
+  return plan.weeks.reduce((n, w) => n + w.sessions.filter((s) => upgradable(s, done, today, runWalk && w.index < walkWeeks)).length, 0);
 }
 
 /**
@@ -318,7 +335,12 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
   const rank = new Map<Phase, number>();
   const longRank = new Map<Phase, number>();
   let tempoRank = 0;
+  const level = plan.input.level;
+  const runWalk = needsRunWalk(plan.input);
+  const walkWeeks = runWalkWeeks(trainingWeeksOf(plan));
   const weeks = plan.weeks.map((w) => {
+    const walking = runWalk && w.index < walkWeeks;
+    const stage = runWalkStage(w.index, walkWeeks);
     const phaseRank = rank.get(w.phase) ?? 0;
     if (w.sessions.some((s) => s.type === "quality")) rank.set(w.phase, phaseRank + 1);
     const longN = longRank.get(w.phase) ?? 0;
@@ -327,12 +349,14 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
       ...w,
       sessions: w.sessions.map((s) => {
         let built: Built | null = null;
-        if (s.type === "quality") built = upgradable(s, done, today) ? qualityWorkout(plan.input.race, w.phase, s.km, phaseRank) : null;
-        else if (s.type === "long") built = upgradable(s, done, today) ? longWorkout(plan.input.race, w.phase, s.km, w.isRecovery, longN) : null;
+        if (!upgradable(s, done, today, walking)) {
+          if (s.type === "tempo") tempoRank++;
+        } else if (s.type === "quality") built = walking ? fartlekWalk(s.km) : qualityWorkout(plan.input.race, w.phase, s.km, phaseRank, level);
+        else if (s.type === "long") built = walking ? runWalkWorkout(s.km, stage + 1, true) : longWorkout(plan.input.race, w.phase, s.km, w.isRecovery, longN, level);
         else if (s.type === "tempo") {
-          built = upgradable(s, done, today) ? tempoWorkout(s.km, tempoRank) : null;
+          built = tempoWorkout(s.km, tempoRank, level);
           tempoRank++;
-        }
+        } else built = runWalkWorkout(s.km, stage, false);
         return built ? { ...s, title: built.title, details: built.details, workout: built.workout } : s;
       }),
     };
@@ -418,7 +442,7 @@ function longThreshold(race: RaceKey, phase: Phase, kmTotal: number): Built {
  * Sortie longue. `n` : rang parmi les sorties longues de la phase (hors semaines de récupération, toujours faciles).
  * Le facile domine ; progressive, alternance et blocs au seuil reviennent de temps en temps quand la distance le permet.
  */
-export function longWorkout(race: RaceKey, phase: Phase, kmTotal: number, recovery: boolean, n: number): Built {
+export function longWorkout(race: RaceKey, phase: Phase, kmTotal: number, recovery: boolean, n: number, level: Level = "intermediaire"): Built {
   if (recovery || phase === "affutage" || phase === "course") return longPlain(kmTotal);
   if (phase === "base") return n % 3 === 2 && kmTotal >= 8 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
   if (phase === "construction") {
@@ -426,16 +450,68 @@ export function longWorkout(race: RaceKey, phase: Phase, kmTotal: number, recove
       case 1:
         return kmTotal >= 8 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
       case 3:
-        return kmTotal >= 12 ? longAlternating(race, phase, kmTotal) : longPlain(kmTotal);
+        return kmTotal >= 12 && level !== "debutant" ? longAlternating(race, phase, kmTotal) : longPlain(kmTotal);
       case 5:
-        return kmTotal >= 12 ? longThreshold(race, phase, kmTotal) : longProgressive(race, phase, kmTotal);
+        return kmTotal >= 12 && level !== "debutant" ? longThreshold(race, phase, kmTotal) : longProgressive(race, phase, kmTotal);
       default:
         return longPlain(kmTotal);
     }
   }
   if (race === "semi" || race === "marathon") {
-    if (kmTotal >= 14) return n % 2 === 0 ? longRaceFinish(race, kmTotal) : longAlternating(race, phase, kmTotal);
+    if (kmTotal >= 14) return n % 2 === 0 || level === "debutant" ? longRaceFinish(race, kmTotal) : longAlternating(race, phase, kmTotal);
     return n % 2 === 1 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
   }
   return n % 2 === 1 && kmTotal >= 8 ? longProgressive(race, phase, kmTotal) : longPlain(kmTotal);
+}
+
+// ---------- Course/marche pour les débutants ----------
+
+/** Course et marche en secondes, de plus en plus de course d'un palier à l'autre. */
+export const RUN_WALK_STAGES: [number, number][] = [
+  [60, 90],
+  [90, 90],
+  [120, 90],
+  [180, 90],
+  [300, 90],
+  [480, 60],
+  [600, 60],
+];
+
+/** Un débutant qui court peu (10 km par semaine ou moins, ou rien de saisi) commence par alterner course et marche. */
+export function needsRunWalk(input: Pick<PlanInput, "level" | "currentWeeklyKm">): boolean {
+  return input.level === "debutant" && input.currentWeeklyKm <= 10;
+}
+
+/** Nombre de semaines de course/marche : 40 % de la préparation, entre 3 et 8 semaines. */
+export function runWalkWeeks(trainingWeeks: number): number {
+  return clamp(Math.round(trainingWeeks * 0.4), 3, 8);
+}
+
+/** Palier de la semaine `week` : on parcourt tous les paliers sur la durée du course/marche. */
+export function runWalkStage(week: number, walkWeeks: number): number {
+  return clamp(Math.floor((week * RUN_WALK_STAGES.length) / walkWeeks), 0, RUN_WALK_STAGES.length - 1);
+}
+
+const WALK_BREAK: Seg = { seconds: 300, intensity: "facile", walk: true };
+
+/** Séance de course/marche au palier donné ; la durée suit les kilomètres de la séance (environ 8 min par km). */
+export function runWalkWorkout(kmTotal: number, stage: number, long: boolean): Built {
+  const [run, walk] = RUN_WALK_STAGES[clamp(stage, 0, RUN_WALK_STAGES.length - 1)];
+  const minutes = clamp(Math.round(kmTotal * 8), 20, 80);
+  const reps = clamp(Math.floor(((minutes - 10) * 60) / (run + walk)), 3, 24);
+  return {
+    title: long ? "Sortie longue course/marche" : "Course/marche",
+    details: `5 min de marche rapide, puis ${reps} × (${fmtSeconds(run)} de course facile / ${fmtSeconds(walk)} de marche), et 5 min de marche pour finir. Cours assez doucement pour pouvoir parler : si tu es essoufflé, ralentis ou marche un peu plus.`,
+    workout: { format: "course-marche", warmKm: 0, coolKm: 0, warm: WALK_BREAK, cool: WALK_BREAK, sets: uniform(reps, { seconds: run, intensity: "facile" }, { seconds: walk, walk: true }) },
+  };
+}
+
+/** Fartlek des premières semaines d'un débutant : récupérations en marchant. */
+export function fartlekWalk(kmTotal: number): Built {
+  const reps = clamp(Math.round(Math.max(1, kmTotal - 3) / 0.6), 4, 6);
+  return {
+    title: "Fartlek en douceur",
+    details: `5 min de marche rapide, puis 5 min de course facile, puis ${reps} × (1 min un peu plus vite / 1 min 30 de marche), et 5 min de marche pour finir. Effort 7/10 sur les phases rapides, sans chronomètre.`,
+    workout: { format: "fartlek-marche", warmKm: 0, coolKm: 0, warm: WALK_BREAK, cool: WALK_BREAK, sets: [{ times: 1, work: { seconds: 300, intensity: "facile" } }, { times: reps, work: { seconds: 60, intensity: "soutenu" }, rest: { seconds: 90, walk: true } }] },
+  };
 }

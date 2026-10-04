@@ -3,7 +3,7 @@ import type { PaceModel } from "../lib/paces";
 import { stepSize, workoutBlocks, type WorkoutStep } from "../lib/steps";
 import { fmtTargetPace } from "../lib/format";
 
-const KIND_LABEL: Record<WorkoutStep["kind"], string> = { easy: "Courir", work: "Courir", stride: "Courir", rest: "Récup." };
+const KIND_LABEL: Record<WorkoutStep["kind"], string> = { easy: "Courir", work: "Courir", stride: "Courir", rest: "Récup.", walk: "Marcher" };
 
 function paceText(step: WorkoutStep): string | null {
   if (!step.pace) return null;

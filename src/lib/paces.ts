@@ -273,6 +273,9 @@ export function targetsFor(model: PaceModel, plan: Plan, session: Session, goal:
     return list.length > 0 ? { targets: list, comparable: false } : null;
   }
 
+  // Course/marche : l'allure moyenne de la sortie est bien plus lente que le facile, donc pas de comparaison.
+  if (session.workout?.format === "course-marche") return { targets: [target("Allure facile", "facile")], comparable: false };
+
   // Sortie longue du catalogue : facile seule (comparable), ou facile puis les allures de son déroulé.
   if (session.type === "long" && session.workout) {
     const easy = target("Allure facile", "facile");
