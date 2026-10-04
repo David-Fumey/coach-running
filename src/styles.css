@@ -3415,3 +3415,16 @@ button {
 .session--strength {
   border-left-color: var(--p-construction);
 }
+
+.week__load {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.week__load--légère {
+  color: var(--done);
+}
+
+.week__load--soutenue {
+  color: var(--t-long);
+}

@@ -1,8 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
-import { generatePlan, type Plan, type PlanInput, type Session, type Week } from "../src/lib/plan.ts";
+import { addDays as addDaysISO, generatePlan, type Plan, type PlanInput, type Session, type Week } from "../src/lib/plan.ts";
 import { paceModel, targetsFor } from "../src/lib/paces.ts";
 import { workoutBlocks } from "../src/lib/steps.ts";
-import { fmtMeters, fmtSeconds, legacyQualityWorkout, longWorkout, qualityWorkout, tempoWorkout, upgradePlan, upgradableCount } from "../src/lib/workouts.ts";
+import { FORMAT_STRESS, VERY_HARD_STRESS, fmtMeters, fmtSeconds, formatStress, legacyQualityWorkout, loadCap, longWorkout, qualityWorkout, tempoWorkout, upgradePlan, upgradableCount, weekLoad } from "../src/lib/workouts.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -108,7 +108,9 @@ check("sorties longues : jamais sans déroulé", longs(marathon).every(({ s }) =
 check("sorties longues : la distance du déroulé = celle de la séance", [marathon, semi, tenK].every((p) => longs(p).every(({ s }) => s.workout!.sets.reduce((a, x) => a + x.times * (x.work.meters ?? 0), 0) === Math.round(s.km * 1000))), longs(marathon).map(({ s }) => [s.km, s.workout!.format]));
 check("sorties longues : semaines de récupération et d'affûtage toujours faciles", longs(marathon).filter(({ w }) => w.isRecovery || w.phase === "affutage").every(({ s }) => s.workout!.format === "longue-facile"));
 const allLongFormats = new Set(longs(marathon).map(({ s }) => s.workout!.format));
-check("marathon : au moins 5 formats de sortie longue différents", allLongFormats.size >= 5, [...allLongFormats]);
+check("marathon sur 5 jours : au moins 4 formats de sortie longue différents", allLongFormats.size >= 4, [...allLongFormats]);
+const marathon4 = generatePlan(input("marathon", "2027-04-04", { daysPerWeek: 4 }));
+check("marathon sur 4 jours (une seule séance de travail) : tous les formats de sortie longue reviennent", new Set(longs(marathon4).map(({ s }) => s.workout!.format)).size >= 5, [...new Set(longs(marathon4).map(({ s }) => s.workout!.format))]);
 check("spécifique marathon : fin à allure de course, puis alternance", longFormats(marathon, "specifique").slice(0, 2).join() === "longue-fin-course,longue-alternance", longFormats(marathon, "specifique"));
 check("construction : le facile domine, avec de la variété", longFormats(marathon, "construction").filter((f) => f === "longue-facile").length >= 2 && new Set(longFormats(marathon, "construction")).size >= 3, longFormats(marathon, "construction"));
 const lf = longWorkout("marathon", "specifique", 20, false, 0);
@@ -161,7 +163,9 @@ const second = (p: Plan) =>
 for (const days of [4, 5, 6] as const) {
   const adv = generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: days, currentWeeklyKm: 40 }));
   const slots = second(adv).filter(({ w }) => !w.isRecovery).map(({ s }) => s[0].type);
-  check(`avancé sur ${days} jours : le deuxième créneau alterne tempo et séance de qualité`, slots.length >= 10 && slots.every((t, i) => t === (i % 2 === 0 ? "tempo" : "quality")), slots);
+  const odd = slots.filter((_, i) => i % 2 === 1);
+  // Une séance de qualité prend la place du tempo une semaine sur deux, sauf quand elle ferait deux séances très dures.
+  check(`avancé sur ${days} jours : le deuxième créneau alterne tempo et séance de qualité`, slots.length >= 10 && slots.every((t, i) => i % 2 === 1 || t === "tempo") && odd.filter((t) => t === "quality").length >= Math.ceil(odd.length / 2), slots);
   const clash = adv.weeks.filter((w) => w.sessions.filter((x) => x.type === "quality").length === 2 && w.sessions.filter((x) => x.type === "quality")[0].workout!.format === w.sessions.filter((x) => x.type === "quality")[1].workout!.format);
   check(`avancé sur ${days} jours : les deux séances de qualité d'une semaine sont de formats différents`, clash.length === 0, clash.map((w) => w.index));
   check(`avancé sur ${days} jours : pas de deuxième séance de qualité en semaine de récupération`, adv.weeks.filter((w) => w.isRecovery).every((w) => w.sessions.filter((x) => x.type === "quality").length <= 1));
@@ -179,6 +183,66 @@ for (const { s, w } of all(oldAdv)) {
 }
 check("ancien plan d'avancé (tempo seulement) : la mise à jour crée les deuxièmes séances de qualité", isDeepStrictEqual(upgradePlan(oldAdv, {}, "2026-10-05"), adv5));
 check("ancien plan d'avancé : la mise à jour est comptée, puis plus rien", upgradableCount(oldAdv, {}, "2026-10-05") > 0 && upgradableCount(upgradePlan(oldAdv, {}, "2026-10-05"), {}, "2026-10-05") === 0);
+
+// ---------- Charge de la semaine ----------
+let loadProblem: unknown = null;
+let stableProblem: unknown = null;
+let loadWeeks = 0;
+for (const race of ["5k", "10k", "semi", "marathon"] as const) {
+  for (const level of ["debutant", "intermediaire", "avance"] as const) {
+    for (const days of [3, 4, 5, 6] as const) {
+      for (const longDay of ["sam", "dim"] as const) {
+        const p = generatePlan(input(race, race === "marathon" ? "2027-04-04" : "2027-02-14", { level, daysPerWeek: days, longDay, currentWeeklyKm: level === "debutant" ? 12 : 35 }));
+        for (const w of p.weeks) {
+          const hard = w.sessions.filter((s) => s.type === "quality" || s.type === "tempo" || s.type === "test");
+          const veryHard = hard.filter((s) => formatStress(s.workout?.format) >= VERY_HARD_STRESS);
+          if (veryHard.length > 1) loadProblem = { deuxTresDures: veryHard.map((s) => s.title), race, level, days, week: w.index };
+          const long = w.sessions.find((s) => s.type === "long");
+          const total = [...hard, ...(long ? [long] : [])].reduce((a, s) => a + formatStress(s.workout?.format), 0);
+          loadWeeks++;
+          if (long && total > loadCap(level, w.isRecovery) && long.workout?.format !== "longue-facile") loadProblem = { plafond: total, cap: loadCap(level, w.isRecovery), long: long.workout?.format, race, level, days, week: w.index };
+        }
+        if (days === 5 && longDay === "dim" && upgradableCount(p, {}, "2026-10-05") !== 0) stableProblem = { race, level, count: upgradableCount(p, {}, "2026-10-05") };
+      }
+    }
+  }
+}
+check(`${loadWeeks} semaines de plans : jamais deux séances très dures, plafond de charge respecté (sinon sortie longue facile)`, loadProblem === null && loadWeeks > 2000, loadProblem);
+check("un plan neuf n'a rien à mettre à jour (le plafond s'applique de la même façon à la création et à la mise à jour)", stableProblem === null, stableProblem);
+check("barème : chaque format du catalogue a un poids", (() => {
+  const known = new Set(Object.keys(FORMAT_STRESS));
+  const used = new Set<string>();
+  for (const race of ["5k", "10k", "semi", "marathon"] as const) for (const level of ["debutant", "intermediaire", "avance"] as const) for (const { s } of all(generatePlan(input(race, race === "marathon" ? "2027-04-04" : "2027-02-14", { level, daysPerWeek: 5, currentWeeklyKm: level === "debutant" ? 0 : 35 })))) if (s.workout) used.add(s.workout.format);
+  return [...used].every((f) => known.has(f));
+})(), "formats sans poids");
+check("plafonds par niveau", loadCap("debutant", false) < loadCap("intermediaire", false) && loadCap("intermediaire", false) < loadCap("avance", false) && loadCap("avance", true) < loadCap("intermediaire", false));
+const heavyWeek = generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: 5, currentWeeklyKm: 40 }));
+const load = heavyWeek.weeks.map((w) => weekLoad(w, "avance"));
+check("charge de la semaine : étiquette et chiffres pour chaque semaine de travail", load.filter((l) => l !== null).length >= 15 && load.every((l) => l === null || (l.stress <= l.cap + 0.01 && ["légère", "modérée", "soutenue"].includes(l.label))), load);
+check("les semaines de récupération ont une charge plus légère que la moyenne des autres", (() => {
+  const rec = heavyWeek.weeks.filter((w) => w.isRecovery).map((w) => weekLoad(w, "avance")!.stress);
+  const norm = heavyWeek.weeks.filter((w) => !w.isRecovery && w.phase !== "course" && w.phase !== "affutage").map((w) => weekLoad(w, "avance")!.stress);
+  return rec.length > 0 && Math.max(...rec) <= Math.max(...norm) && rec.reduce((a, b) => a + b, 0) / rec.length < norm.reduce((a, b) => a + b, 0) / norm.length;
+})());
+check("charge inconnue sans déroulé détaillé (ancien plan), ou en pause", weekLoad({ sessions: [{ ...heavyWeek.weeks[0].sessions[0], workout: undefined }], isRecovery: false }, "avance") === null && weekLoad({ sessions: heavyWeek.weeks[0].sessions, isRecovery: false, paused: true }, "avance") === null);
+// Un plan enregistré avant le plafond : la mise à jour corrige ce qui dépasse, jamais le passé ni le fait.
+const heavy: Plan = JSON.parse(JSON.stringify(generatePlan(input("10k", "2027-02-14", { level: "intermediaire", daysPerWeek: 5, currentWeeklyKm: 40 }))));
+const hw = heavy.weeks.find((w) => w.phase === "construction" && !w.isRecovery && w.sessions.some((s) => s.type === "quality" && s.workout?.format === "fractionne") && w.sessions.some((s) => s.type === "tempo"))!;
+const hl = hw.sessions.find((s) => s.type === "long")!;
+Object.assign(hl, { title: "Sortie longue avec blocs au seuil", workout: longWorkout("10k", "construction", hl.km, false, 5, "intermediaire").workout });
+hl.workout = { ...hl.workout!, format: "longue-seuil" };
+const fixed = upgradePlan(heavy, {}, "2026-10-05");
+const fixedLong = fixed.weeks[hw.index].sessions.find((s) => s.type === "long")!;
+check("sortie longue trop lourde dans un plan enregistré : redevient facile", fixedLong.workout!.format === "longue-facile" && fixedLong.title === "Sortie longue" && fixedLong.km === hl.km);
+check("sortie longue trop lourde déjà faite : intacte", upgradePlan(heavy, { [hl.id]: true }, "2026-10-05").weeks[hw.index].sessions.find((s) => s.type === "long")!.workout!.format === "longue-seuil");
+check("sortie longue trop lourde passée : intacte", upgradePlan(heavy, {}, hl.date > "2026-10-06" ? addDaysISO(hl.date, 1) : "2099-01-01").weeks[hw.index].sessions.find((s) => s.type === "long")!.workout!.format === "longue-seuil");
+const two: Plan = JSON.parse(JSON.stringify(generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: 5, currentWeeklyKm: 40 }))));
+const tw = two.weeks.find((w) => w.phase === "construction" && !w.isRecovery && w.sessions.some((s) => s.type === "quality" && s.workout?.format === "fractionne") && w.sessions.some((s) => s.type === "tempo"))!;
+const tt = tw.sessions.find((s) => s.type === "tempo")!;
+const pyr = qualityWorkout("10k", "construction", tt.km, 1, "avance");
+Object.assign(tt, { type: "quality", title: pyr.title, details: pyr.details, workout: pyr.workout });
+const mended = upgradePlan(two, {}, "2026-10-05");
+check("deux séances très dures dans un plan enregistré : la seconde redevient un tempo", mended.weeks[tw.index].sessions.filter((s) => s.type === "quality").length === 1 && mended.weeks[tw.index].sessions.some((s) => s.type === "tempo") && upgradableCount(mended, {}, "2026-10-05") === 0);
 
 // ---------- Mise à jour d'un plan enregistré ----------
 const oldMarathon: Plan = JSON.parse(JSON.stringify(marathon));

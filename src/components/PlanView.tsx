@@ -8,7 +8,7 @@ import PaceCard, { PaceLine } from "./PaceCard";
 import GoalCard from "./GoalCard";
 import WorkoutSteps from "./WorkoutSteps";
 import StrengthSteps from "./StrengthSteps";
-import { upgradableCount } from "../lib/workouts";
+import { upgradableCount, weekLoad } from "../lib/workouts";
 import ShiftCard from "./ShiftCard";
 import type { Goal } from "../lib/goal";
 import type { PaceModel } from "../lib/paces";
@@ -112,6 +112,7 @@ function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekP
   // Courses, renforcement et mobilité, dans l'ordre des jours.
   const entries = [...week.sessions, ...(week.extras ?? [])].sort((a, b) => a.date.localeCompare(b.date));
   const doneCount = entries.filter((s) => done[s.id]).length;
+  const load = weekLoad(week, plan.input.level);
   const end = addDays(week.startDate, 6);
   const range = `${fmtDate(week.startDate, { day: "numeric", month: "short" })} au ${fmtDate(end, { day: "numeric", month: "short" })}`;
 
@@ -126,7 +127,15 @@ function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekP
           {entries.length === 0 ? "–" : `${doneCount}/${entries.length}`}
         </span>
       </summary>
-      <p className="week__focus">{week.focus}</p>
+      <p className="week__focus">
+        {week.focus}
+        {load && (
+          <span className={`week__load week__load--${load.label}`}>
+            {" "}
+            Charge {load.label}.
+          </span>
+        )}
+      </p>
       <ul className="sessions">
         {entries.map((s) => (
           <SessionRow

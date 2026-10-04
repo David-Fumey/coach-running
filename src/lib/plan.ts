@@ -1,6 +1,7 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
 import { weekExtras } from "./strength.ts";
+import { VERY_HARD_STRESS, formatStress, loadCap } from "./workouts.ts";
 import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout, testBuilt } from "./workouts.ts";
 
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
@@ -393,6 +394,9 @@ export function generatePlan(input: PlanInput): Plan {
       testHere = testsEnabled && (phase === "construction" || phase === "specifique") && !testedPhases.has(phase) && !isRecovery && !walking;
       if (testHere) testedPhases.add(phase);
       const phaseRank = qualityRank.get(phase) ?? 0;
+      // Charge de la semaine : sert à ne pas empiler deux séances très dures ni une sortie longue qui fait dépasser le plafond.
+      let weekStress = 0;
+      let mainFormat = "";
       slots.forEach((type, i) => {
         const date = addDays(weekStart, days[i]);
         let km: number;
@@ -403,6 +407,8 @@ export function generatePlan(input: PlanInput): Plan {
           case "long":
             km = longKm;
             content = walking ? runWalkWorkout(round05(km), stage + 1, true) : longWorkout(race, phase, round05(km), isRecovery, longRank.get(phase) ?? 0, level);
+            // Trop de charge avec les séances de travail de la semaine : sortie longue facile.
+            if (weekStress + formatStress(content.workout?.format) > loadCap(level, isRecovery)) content = longWorkout(race, phase, round05(km), true, 0, level);
             break;
           case "quality":
             km = qualityKm;
@@ -412,14 +418,19 @@ export function generatePlan(input: PlanInput): Plan {
               isTest = true;
               content = t.built;
             } else content = walking ? fartlekWalk(round05(km)) : qualityWorkout(race, phase, round05(km), phaseRank, level);
+            mainFormat = content.workout?.format ?? "";
+            weekStress += formatStress(mainFormat);
             break;
           case "tempo":
             km = tempoKm;
             // Un avancé alterne, sur ce créneau, tempo ou intervalles au seuil et une deuxième séance de qualité.
-            if (level === "avance" && !isRecovery && secondRank % 2 === 1) {
-              content = qualityWorkout(race, phase, round05(km), phaseRank + 1, level);
+            const candidate = level === "avance" && !isRecovery && secondRank % 2 === 1 ? qualityWorkout(race, phase, round05(km), phaseRank + 1, level) : null;
+            // Jamais deux séances très dures dans la même semaine : le tempo prend alors la place.
+            if (candidate && !(formatStress(mainFormat) >= VERY_HARD_STRESS && formatStress(candidate.workout.format) >= VERY_HARD_STRESS)) {
+              content = candidate;
               isSecondQuality = true;
             } else content = tempoWorkout(round05(km), level === "avance" ? Math.floor(secondRank / 2) : secondRank, level);
+            weekStress += formatStress(content.workout?.format);
             // La semaine de récupération d'un avancé ne fait pas avancer l'alternance.
             if (!(level === "avance" && isRecovery)) secondRank++;
             break;

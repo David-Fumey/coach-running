@@ -290,6 +290,67 @@ export function tempoWorkout(km: number, n: number, level: Level = "intermediair
   return n % 2 === 0 ? continuousTempo(km) : cruiseIntervals(km, levelCycle(level, Math.floor(n / 2)));
 }
 
+// ---------- Charge de la semaine ----------
+
+/**
+ * Poids d'une séance dans la charge de la semaine, par format. Très dures (3) : pyramides, fractionné, répétitions à allure de course et tests.
+ * Modérées (2 à 2,5) : côtes, fractionné vif, fartlek, tempo, intervalles au seuil, blocs d'allure de course. Les sorties longues pèsent de 1
+ * (facile) à 2,5 (blocs au seuil). Le facile, la récupération, le renforcement et la mobilité ne comptent pas.
+ */
+export const FORMAT_STRESS: Record<string, number> = {
+  cotes: 2.5,
+  pyramide: 3,
+  fractionne: 3,
+  "fractionne-vif": 2.5,
+  "fractionne-course": 3,
+  "test-5k": 3,
+  "test-30": 3,
+  fartlek: 2,
+  "fartlek-pyramide": 2,
+  "rappel-allure": 2,
+  tempo: 2,
+  "seuil-intervalles": 2,
+  "blocs-course": 2,
+  "intervalles-course": 2.5,
+  progressive: 2,
+  "fartlek-marche": 1,
+  "course-marche": 1,
+  "longue-facile": 1,
+  "longue-progressive": 1.5,
+  "longue-fin-course": 2,
+  "longue-alternance": 2,
+  "longue-seuil": 2.5,
+};
+
+/** À partir de ce poids, une séance est « très dure » : deux séances très dures ne vont pas dans la même semaine. */
+export const VERY_HARD_STRESS = 3;
+
+export const formatStress = (format: string | undefined): number => (format ? FORMAT_STRESS[format] ?? 0 : 0);
+
+/** Charge maximale d'une semaine : un débutant en supporte moins, un avancé plus ; une semaine de récupération est plafonnée. */
+export function loadCap(level: Level, recovery: boolean): number {
+  if (recovery) return 5;
+  return { debutant: 5, intermediaire: 7, avance: 8 }[level];
+}
+
+export interface WeekLoad {
+  stress: number;
+  cap: number;
+  label: "légère" | "modérée" | "soutenue";
+}
+
+/** Charge d'une semaine (qualité, tempo, test et sortie longue), ou null si une séance n'a pas de déroulé détaillé. */
+export function weekLoad(week: { sessions: Session[]; isRecovery: boolean; paused?: boolean }, level: Level): WeekLoad | null {
+  if (week.paused) return null;
+  const hard = week.sessions.filter((s) => s.type === "quality" || s.type === "tempo" || s.type === "test" || s.type === "long");
+  if (hard.length === 0 || hard.some((s) => !s.workout)) return null;
+  const stress = hard.reduce((acc, s) => acc + formatStress(s.workout!.format), 0);
+  const cap = loadCap(level, week.isRecovery);
+  // L'étiquette se mesure toujours au plafond ordinaire du niveau : une semaine de récupération y paraît plus légère.
+  const ratio = stress / loadCap(level, false);
+  return { stress, cap, label: ratio <= 0.6 ? "légère" : ratio <= 0.9 ? "modérée" : "soutenue" };
+}
+
 // ---------- Plans enregistrés avant le catalogue ----------
 
 /** Déroulé d'une séance de qualité écrite avant le catalogue (même contenu qu'à l'époque). */
@@ -395,7 +456,13 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
     if (mainQuality) rank.set(w.phase, phaseRank + 1);
     const longN = longRank.get(w.phase) ?? 0;
     if (!w.isRecovery && w.sessions.some((s) => s.type === "long")) longRank.set(w.phase, longN + 1);
-    const sessions = w.sessions.map((s) => {
+    let mainFormat = "";
+    const upgraded = w.sessions.map((s) => {
+      const r = upgradeSession(s);
+      if (s === mainQuality || s === testTarget || r.type === "test") mainFormat = r.workout?.format ?? mainFormat;
+      return r;
+    });
+    function upgradeSession(s: Session): Session {
       if (s === testTarget) {
         const t = testBuilt(w.phase);
         return { ...s, type: "test" as const, km: t.km, title: t.built.title, details: t.built.details, workout: t.built.workout };
@@ -408,7 +475,18 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
       // Plan d'avancé enregistré avant la deuxième séance de qualité : un tempo sur deux devient une séance de qualité.
       if (s.type === "tempo" && level === "avance" && !w.isRecovery && n % 2 === 1 && open) {
         const q = qualityWorkout(plan.input.race, w.phase, s.km, phaseRank + 1, level);
-        return { ...s, type: "quality" as const, title: q.title, details: q.details, workout: q.workout };
+        // Pas deux séances très dures dans la même semaine : on garde alors le tempo.
+        if (!(formatStress(mainFormat) >= VERY_HARD_STRESS && formatStress(q.workout.format) >= VERY_HARD_STRESS)) {
+          return { ...s, type: "quality" as const, title: q.title, details: q.details, workout: q.workout };
+        }
+      }
+      // Une deuxième séance de qualité très dure à côté d'une séance principale très dure devient un tempo.
+      if (s.type === "quality" && s !== mainQuality && open && !walking) {
+        const format = s.workout?.format ?? qualityWorkout(plan.input.race, w.phase, s.km, phaseRank + 1, level).workout.format;
+        if (formatStress(mainFormat) >= VERY_HARD_STRESS && formatStress(format) >= VERY_HARD_STRESS) {
+          const t = tempoWorkout(s.km, level === "avance" ? Math.floor(n / 2) : n, level);
+          return { ...s, type: "tempo" as const, title: t.title, details: t.details, workout: t.workout };
+        }
       }
       if (!upgradable(s, done, today, walking)) {
         // rien à changer
@@ -417,6 +495,14 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
       else if (s.type === "tempo") built = tempoWorkout(s.km, level === "avance" ? Math.floor(n / 2) : n, level);
       else built = runWalkWorkout(s.km, stage, false);
       return built ? { ...s, title: built.title, details: built.details, workout: built.workout } : s;
+    }
+    // Plafond de charge : une sortie longue qui ferait dépasser le plafond de la semaine redevient facile.
+    const others = upgraded.filter((s) => s.type === "quality" || s.type === "tempo" || s.type === "test").reduce((acc, s) => acc + formatStress(s.workout?.format), 0);
+    const sessions = upgraded.map((s) => {
+      if (s.type !== "long" || !s.workout || s.workout.format === "longue-facile" || s.date < today || done[s.id]) return s;
+      if (others + formatStress(s.workout.format) <= loadCap(level, w.isRecovery)) return s;
+      const plain = longWorkout(plan.input.race, w.phase, s.km, true, longN, level);
+      return { ...s, title: plain.title, details: plain.details, workout: plain.workout };
     });
     // Renforcement et mobilité les jours sans course, pour les semaines qui n'en ont pas encore.
     const placed = w.paused
