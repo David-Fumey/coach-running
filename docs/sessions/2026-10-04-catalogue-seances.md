@@ -55,3 +55,15 @@
 - **Avancé sur 4 jours** : deux séances de travail par semaine (qualité + tempo, créneau « footing » remplacé), le tempo pèse 20 % du volume (au lieu de 15 %) pour que le footing restant ne dépasse pas la sortie longue. Sur 5 et 6 jours, les intermédiaires et les avancés avaient déjà qualité + tempo.
 - La mise à jour d'un plan enregistré (`upgradePlan`) couvre aussi la course/marche des débutants.
 - Pistes restantes : séance de contrôle, jours de repos ou de renforcement, deuxième séance de qualité sur 5 et 6 jours pour les avancés.
+
+## Séance de contrôle : test de 5 km (ajout)
+
+- **Idée** : un 5 km chronométré donne le niveau du coureur plus précisément que la moyenne de ses sorties, donc des allures cibles plus justes.
+- **Placement** (`generatePlan`) : un test (`type: "test"`, « Test 5 km chronométré », 8 km = 2 km d'échauffement + 5 km + 1 km de retour au calme) au début de la phase de construction et au début de la phase spécifique, à la place de la séance de qualité de la première semaine qui n'est pas une semaine de récupération. Pas de test pour une préparation de moins de 8 semaines, ni pendant les semaines de course/marche d'un débutant. Le rang de rotation des séances de qualité n'avance pas à cause du test.
+- **Résultat** (`src/lib/tests.ts`, pur) : le temps sur 5 km se renseigne dans une carte « Test de 5 km » (Accueil et Programme) dès le jour du test, pendant 21 jours. Si Strava a lu le détail de la sortie, il propose son meilleur 5 km (`efforts["5k"]`) en un clic ; sinon (ou si le test n'est pas ce meilleur 5 km) saisie à la main, de 15:00 à 60:00. La carte montre l'effet avant d'enregistrer : « Ton allure facile passerait de X à Y ». Clé `foulee.tests.v1`, incluse dans la sauvegarde et validée à l'import (anciennes sauvegardes sans `tests` acceptées).
+- **Priorité des références** (`paceModel`) : allure moyenne saisie à la main > test de moins de 12 semaines > moyenne des sorties > test plus ancien > temps objectif. Nouvelle source « test » dans la carte « Mes allures cibles ».
+- **Programme** : la carte « Mon test de 5 km » montre le dernier résultat (et le supprime) et la date du prochain test.
+- **Mise à jour d'un plan enregistré** (`upgradePlan`) : place aussi les tests dans les phases qui n'en ont pas (première séance de qualité à venir non faite), et recalcule les kilomètres de la semaine concernée. `upgradableCount` compte désormais les séances qui changeraient réellement.
+- Tests : `npm run test:control` (16e script) : placement, mise à jour d'un ancien plan, saisie, séance en attente avec Strava, priorité des références, sauvegarde.
+- Vérifié dans le navigateur avec un plan daté du passé : la carte propose le meilleur 5 km relevé par Strava et chiffre l'effet sur l'allure facile (rien n'a été enregistré, plan d'origine remis).
+- Pistes restantes : jours de repos et renforcement ; deuxième séance de qualité sur 5 et 6 jours pour les avancés ; test de 30 minutes comme alternative.
