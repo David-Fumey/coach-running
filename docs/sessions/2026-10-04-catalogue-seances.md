@@ -99,3 +99,13 @@
 - La carte du test adapte son titre, son champ (« 6,8 ») et montre l'effet sur l'allure facile en tapant ; le résumé du Programme et la carte « Mes allures cibles » indiquent le type de test.
 - La mise à jour d'un ancien plan place un test de 30 minutes dans la phase spécifique et un 5 km dans la construction.
 - Tests : `test:control` étendu (distance valide ou non, niveau tiré du 30 minutes, pas de proposition Strava, déroulé, sauvegarde).
+
+## Garde-fou de charge hebdomadaire (ajout)
+
+- **Barème** (`FORMAT_STRESS` dans `workouts.ts`, un poids par format) : très dures (3) = pyramides, fractionné, répétitions à allure de course, tests ; modérées (2 à 2,5) = côtes, fractionné vif, fartlek, tempo, intervalles au seuil, blocs et intervalles d'allure de course, progressive ; sorties longues de 1 (facile) à 2,5 (blocs au seuil) ; facile, récupération, renforcement et mobilité = 0.
+- **Règle 1** : jamais deux séances très dures (qualité, tempo, test) dans la même semaine. Si la deuxième séance de qualité d'un avancé était aussi très dure que la séance principale, elle devient un tempo (ou des intervalles au seuil).
+- **Règle 2** : plafond de charge de la semaine (qualité + tempo + test + sortie longue) : 5 pour un débutant et en semaine de récupération, 7 pour un intermédiaire, 8 pour un avancé. Une sortie longue qui ferait dépasser le plafond redevient une sortie facile. La conséquence : pour un intermédiaire à 5 ou 6 jours (qualité + tempo), les sorties longues avec blocs au seuil disparaissent ; à 3 ou 4 jours (une seule séance de travail), tous les formats reviennent.
+- **Mise à jour d'un plan enregistré** : applique les mêmes règles aux séances à venir non faites. Une deuxième séance de qualité trop dure devient un tempo ; une sortie longue trop lourde redevient facile. Un plan neuf n'a rien à mettre à jour (même règle à la création et à la mise à jour).
+- **Affichage** : le Programme ajoute à chaque semaine « Charge légère / modérée / soutenue », mesurée au plafond ordinaire du niveau (une semaine de récupération paraît donc plus légère). Rien pour les anciens plans sans déroulé, ni les semaines de pause.
+- Tests : `test:workouts` : plus de 2 000 semaines de plans (courses, niveaux, fréquences, jour de la sortie longue) sans deux séances très dures et sous le plafond, plan neuf stable à la mise à jour, correction d'anciens plans (sortie longue trop lourde, deux séances très dures), étiquettes de charge.
+- Piste restante : relire le barème avec un entraîneur (les poids sont des choix de bon sens, pas une mesure).
