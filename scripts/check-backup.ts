@@ -25,6 +25,7 @@ const full: Snapshot = {
   paceRef: 6.25,
   goal: { race: "10k", minutes: 47.5 },
   water: [{ id: "w1", date: "2026-10-05", ml: 250 }, { id: "w2", date: "2026-10-05", ml: 500 }],
+  favorites: ["pancakes-banane", "porridge"],
   tests: [{ id: "t1", date: "2026-10-05", minutes: 24.5, sessionId: "s-2026-10-05" }],
   sweat: [{ id: "p1", date: "2026-10-05", km: 10, minutes: 60, before: 70, after: 69.3, drankMl: 200, conditions: "temperee" }],
 };
@@ -55,6 +56,11 @@ check("clés absentes = valeurs par défaut", (() => {
 })());
 check("plan invalide", err(mutate((o) => (o.data.plan.weeks = "x"))) !== null && err(mutate((o) => (o.data.plan.weeks[0].sessions[0].km = "5"))) !== null);
 check("activité invalide", err(mutate((o) => (o.data.activities[0].km = -2))) !== null && err(mutate((o) => (o.data.activities[0].date = "hier"))) !== null && err(mutate((o) => (o.data.activities[0].feeling = 9))) !== null);
+check("favorites invalides", err(mutate((o) => (o.data.favorites = "x"))) !== null && err(mutate((o) => (o.data.favorites = [1]))) !== null && err(mutate((o) => (o.data.favorites = [""]))) !== null);
+check("favorites absentes = liste vide", (() => {
+  const r = parseBackup(JSON.stringify({ app: "foulee", version: 1, data: {} }));
+  return r.ok && r.data.favorites.length === 0;
+})());
 check("aliment invalide", err(mutate((o) => (o.data.foods[0].kcal = "beaucoup"))) !== null && err(mutate((o) => (o.data.foods[0].carbs = -1))) !== null);
 check("profil invalide", err(mutate((o) => (o.data.profile.weightKg = 5))) !== null && err(mutate((o) => (o.data.profile.goal = "x"))) !== null && err(mutate((o) => (o.data.profile.sex = "z"))) !== null);
 check("allure moyenne invalide", err(mutate((o) => (o.data.paceRef = 1))) !== null && err(mutate((o) => (o.data.paceRef = "6:00"))) !== null && err(mutate((o) => (o.data.paceRef = 40))) !== null);

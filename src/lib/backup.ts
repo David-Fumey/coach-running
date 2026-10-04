@@ -26,9 +26,11 @@ export interface Snapshot {
   sweat: Weighing[];
   /** Tests de 5 km chronométrés, qui recalent les allures cibles */
   tests: TestResult[];
+  /** Identifiants des recettes mises en favorites */
+  favorites: string[];
 }
 
-export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null, water: [], sweat: [], tests: [] };
+export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null, water: [], sweat: [], tests: [], favorites: [] };
 
 /** Identifiant interne, resté « foulee » (ancien nom de l'application) pour que les anciennes sauvegardes restent lisibles. */
 const APP = "foulee";
@@ -160,6 +162,7 @@ export function parseBackup(text: string): ParseResult {
   const water = d.water ?? [];
   const sweat = d.sweat ?? [];
   const tests = d.tests ?? [];
+  const favorites = d.favorites ?? [];
 
   if (plan !== null && !validPlan(plan)) return { ok: false, error: "Le plan contenu dans le fichier est invalide." };
   if (!isObj(done) || !Object.values(done).every((v) => v === true)) return { ok: false, error: "Les séances validées du fichier sont invalides." };
@@ -171,6 +174,7 @@ export function parseBackup(text: string): ParseResult {
   if (!Array.isArray(water) || !water.every(validWater)) return { ok: false, error: "Le suivi d'hydratation du fichier est invalide." };
   if (!Array.isArray(sweat) || !sweat.every(validWeighing)) return { ok: false, error: "Les pesées du fichier sont invalides." };
   if (!Array.isArray(tests) || !tests.every(validTest)) return { ok: false, error: "Les tests de 5 km du fichier sont invalides." };
+  if (!Array.isArray(favorites) || favorites.length > 500 || !favorites.every((f) => typeof f === "string" && f.length > 0 && f.length <= 64)) return { ok: false, error: "Les recettes favorites du fichier sont invalides." };
   if (goal !== null && !validGoal(goal)) return { ok: false, error: "Le temps objectif du fichier est invalide." };
 
   return {
@@ -186,6 +190,7 @@ export function parseBackup(text: string): ParseResult {
       water: water as Water[],
       sweat: sweat as Weighing[],
       tests: tests as TestResult[],
+      favorites: favorites as string[],
       confirmed: plan === null ? false : confirmed,
     },
   };

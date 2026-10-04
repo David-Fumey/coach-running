@@ -11,6 +11,7 @@ import {
   dietsOf,
   filterRecipes,
   ingredientLines,
+  knownFavorites,
   nutritionOf,
   suggestCriteria,
   type Criteria,
@@ -27,6 +28,8 @@ interface Props {
   activities: Activity[];
   profile: Profile | null;
   onAddFood: (f: Omit<Food, "id">) => void;
+  favorites: string[];
+  onToggleFavorite: (id: string) => void;
 }
 
 const MOMENTS: MomentFilter[] = ["tous", "petit-dej", "avant", "pendant", "apres", "repas", "veille"];
@@ -41,14 +44,17 @@ const TIMES: { label: string; value: number | null }[] = [
 const fmt = (x: number) => String(Math.round(x * 10) / 10).replace(".", ",");
 
 /** Recettes conseillées : on règle les critères, et on ajoute une portion au journal d'un clic. */
-export default function Recipes({ plan, done, activities, profile, onAddFood }: Props) {
+export default function Recipes({ plan, done, activities, profile, onAddFood, favorites, onToggleFavorite }: Props) {
   const today = todayISO();
   const ctx = dayContext(plan, activities, done, today, today);
   const [criteria, setCriteria] = useState<Criteria>(() => suggestCriteria(ctx.kind, ctx.eve));
   const [openId, setOpenId] = useState<string | null>(null);
 
   const suggestion = suggestCriteria(ctx.kind, ctx.eve);
-  const results = filterRecipes(criteria);
+  const favs = knownFavorites(favorites);
+  const [onlyFavs, setOnlyFavs] = useState(false);
+  const matching = filterRecipes(criteria);
+  const results = onlyFavs ? matching.filter((r) => favs.includes(r.id)) : matching;
   const target = profile ? dayTarget(plan, profile, activities, done, today, today) : null;
   const isDefault = JSON.stringify(criteria) === JSON.stringify(DEFAULT_CRITERIA);
 
@@ -120,14 +126,23 @@ export default function Recipes({ plan, done, activities, profile, onAddFood }: 
         </div>
       </details>
 
-      <p className="recipes__count" role="status">
-        {results.length === 0 ? "Aucune recette" : results.length === 1 ? "1 recette" : `${results.length} recettes`}
-      </p>
+      <div className="recipes__bar">
+        <p className="recipes__count" role="status">
+          {results.length === 0 ? "Aucune recette" : results.length === 1 ? "1 recette" : `${results.length} recettes`}
+        </p>
+        <Chip pressed={onlyFavs} onClick={() => setOnlyFavs((v) => !v)}>
+          ★ Favorites ({favs.length})
+        </Chip>
+      </div>
 
       {results.length === 0 ? (
         <div className="empty">
-          <p>Aucune recette ne répond à tous ces critères. Retire-en un (le temps ou l'apport sont les plus restrictifs) pour en voir davantage.</p>
-          <button type="button" className="btn" onClick={() => setCriteria(DEFAULT_CRITERIA)}>
+          {onlyFavs && matching.length > 0 ? (
+            <p>Aucune de tes recettes favorites ne répond à ces critères. Ouvre une recette et appuie sur « ☆ Ajouter aux favorites » pour en garder.</p>
+          ) : (
+            <p>Aucune recette ne répond à tous ces critères. Retire-en un (le temps ou l'apport sont les plus restrictifs) pour en voir davantage.</p>
+          )}
+          <button type="button" className="btn" onClick={() => { setCriteria(DEFAULT_CRITERIA); setOnlyFavs(false); }}>
             Tout effacer
           </button>
         </div>
@@ -142,6 +157,8 @@ export default function Recipes({ plan, done, activities, profile, onAddFood }: 
               open={openId === r.id}
               onToggle={(o) => setOpenId((cur) => (o ? r.id : cur === r.id ? null : cur))}
               onAddFood={onAddFood}
+              favorite={favs.includes(r.id)}
+              onToggleFavorite={() => onToggleFavorite(r.id)}
               today={today}
             />
           ))}
@@ -193,6 +210,8 @@ function RecipeCard({
   open,
   onToggle,
   onAddFood,
+  favorite,
+  onToggleFavorite,
   today,
 }: {
   recipe: Recipe;
@@ -201,6 +220,8 @@ function RecipeCard({
   open: boolean;
   onToggle: (open: boolean) => void;
   onAddFood: (f: Omit<Food, "id">) => void;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   today: string;
 }) {
   const [portions, setPortions] = useState(1);
@@ -233,7 +254,10 @@ function RecipeCard({
   return (
     <details className="recipe" open={open} onToggle={(e) => onToggle((e.currentTarget as HTMLDetailsElement).open)}>
       <summary>
-        <span className="recipe__name">{recipe.name}</span>
+        <span className="recipe__name">
+          {favorite && <span className="recipe__star" role="img" aria-label="Favorite">★ </span>}
+          {recipe.name}
+        </span>
         <span className="recipe__meta">
           {recipe.minutes} min · {n.kcal} kcal · {highlight}
         </span>
@@ -319,6 +343,9 @@ function RecipeCard({
         <div className="actions">
           <button type="button" className="btn btn--primary" onClick={add}>
             Ajouter au journal d'aujourd'hui
+          </button>
+          <button type="button" className="btn" aria-pressed={favorite} onClick={onToggleFavorite}>
+            {favorite ? "★ Retirer des favorites" : "☆ Ajouter aux favorites"}
           </button>
         </div>
         {added && (

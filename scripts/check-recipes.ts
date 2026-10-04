@@ -13,6 +13,8 @@ import {
   nutritionOf,
   suggestCriteria,
   suitsDiet,
+  knownFavorites,
+  toggleFavorite,
   type Criteria,
   type Diet,
   type FoodId,
@@ -162,5 +164,23 @@ check("suggestions : toujours au moins 1 résultat", (["repos", "facile", "inten
 
 const labels: MomentFilter[] = ["tous", "petit-dej", "avant", "pendant", "apres", "repas", "veille"];
 check("momentspossibles : tous les filtres retournent un tableau", labels.every((m) => Array.isArray(filterRecipes(crit({ moment: m })))));
+
+// ---------- Favorites ----------
+
+check("favorites : ajout puis retrait", (() => {
+  const a = toggleFavorite([], RECIPES[0].id);
+  const b = toggleFavorite(a, RECIPES[1].id);
+  const c = toggleFavorite(b, RECIPES[0].id);
+  return a.length === 1 && b.length === 2 && c.length === 1 && c[0] === RECIPES[1].id;
+})());
+check("favorites : la liste d'origine n'est pas modifiée", (() => {
+  const base = [RECIPES[0].id];
+  toggleFavorite(base, RECIPES[1].id);
+  return base.length === 1;
+})());
+check("favorites : identifiants inconnus et doublons écartés", (() => {
+  const k = knownFavorites([RECIPES[0].id, "inconnue", RECIPES[0].id, RECIPES[2].id]);
+  return k.length === 2 && k[0] === RECIPES[0].id && k[1] === RECIPES[2].id;
+})());
 
 process.exit(failures ? 1 : 0);

@@ -4151,3 +4151,21 @@ body {
 .months__all {
   justify-self: end;
 }
+
+/* ---------- Recettes favorites ---------- */
+
+.recipes__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.recipes__bar .recipes__count {
+  margin: 0;
+}
+
+.recipe__star {
+  color: var(--p-course);
+}

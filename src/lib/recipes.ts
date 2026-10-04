@@ -770,3 +770,14 @@ export function describeSuggestion(kind: DayKind, eve: boolean): string {
       return "Footing facile : toutes les recettes conviennent, choisis selon ton envie.";
   }
 }
+
+/** Ajoute ou retire une recette des favorites (liste d'identifiants, sans doublon). */
+export function toggleFavorite(favorites: string[], id: string): string[] {
+  return favorites.includes(id) ? favorites.filter((f) => f !== id) : [...favorites, id];
+}
+
+/** Garde les identifiants qui désignent encore une recette connue, sans doublon. */
+export function knownFavorites(favorites: string[], recipes: Recipe[] = RECIPES): string[] {
+  const known = new Set(recipes.map((r) => r.id));
+  return [...new Set(favorites)].filter((id) => known.has(id));
+}

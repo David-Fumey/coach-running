@@ -37,6 +37,8 @@ interface Props {
   sweat: Weighing[];
   onAddWeighing: (w: Omit<Weighing, "id">) => void;
   onDeleteWeighing: (id: string) => void;
+  favorites: string[];
+  onToggleFavorite: (id: string) => void;
   /** Volet à ouvrir au départ (depuis le rappel d'hydratation) */
   startView?: View;
 }
@@ -81,7 +83,7 @@ export default function Nutrition(props: Props) {
         />
       )}
       {view === "recettes" && (
-        <Recipes plan={props.plan} done={props.done} activities={props.activities} profile={props.profile} onAddFood={props.onAddFood} />
+        <Recipes plan={props.plan} done={props.done} activities={props.activities} profile={props.profile} onAddFood={props.onAddFood} favorites={props.favorites} onToggleFavorite={props.onToggleFavorite} />
       )}
       {view === "conseils" && <Advice plan={props.plan} profile={props.profile} onOpenProfile={props.onOpenProfile} />}
     </div>
