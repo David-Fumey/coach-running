@@ -81,3 +81,13 @@
 - Tests : `npm run test:strength` (17e script) : placement sur 96 combinaisons (courses, niveaux, fréquences, jour de la sortie longue), contenu et progression, conseils de repos, décalage, ancien plan, sauvegarde.
 - Vérifié dans le navigateur (plans temporaires, ton plan remis tel quel) : semaine avec renforcement, carte « Aujourd'hui », carte de repos.
 - Pistes restantes : deuxième séance de qualité sur 5 et 6 jours pour les avancés, test de 30 minutes, renforcement avec charges, validation du contenu par un coach ou un kiné.
+
+## Deuxième séance de qualité des avancés (ajout)
+
+- Un avancé qui court 4, 5 ou 6 jours par semaine alterne, sur son deuxième créneau de travail, un **tempo ou des intervalles au seuil** et une **deuxième séance de qualité** du catalogue. Une semaine peut donc contenir deux séances de qualité de nature différente (par exemple côtes le mardi, pyramide le jeudi). Les intermédiaires gardent le tempo seul ; sur 3 jours, tout le monde reste à une séance de qualité.
+- **Formats distincts** : la deuxième séance prend le format qui suit celui de la séance principale de la même semaine dans la rotation de la phase (rang + 1), donc jamais le même.
+- **Semaines de récupération** : pas de deuxième séance de qualité (tempo ou intervalles au seuil), et elles ne font pas avancer l'alternance, qui reste régulière sur les autres semaines.
+- Le rang de cette alternance (`secondRank`) compte les séances du deuxième créneau ; une semaine qui a un test garde sa deuxième séance de qualité (le test remplace la séance principale).
+- **Mise à jour d'un ancien plan d'avancé** : un tempo sur deux à venir devient une séance de qualité (même date, mêmes kilomètres), les séances déjà faites ne bougent pas. Le résultat est identique à un plan neuf.
+- Tests : `test:workouts` (alternance, formats différents, récupération, déroulés, intermédiaire inchangé, mise à jour d'un ancien plan d'avancé).
+- Pistes restantes : test de 30 minutes comme alternative au 5 km, charge de travail hebdomadaire (limiter les semaines à deux séances très dures d'affilée).
