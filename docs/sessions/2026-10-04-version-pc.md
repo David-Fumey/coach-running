@@ -33,3 +33,9 @@ Contrôlé à 1400 et 1024 px, puis en mobile (375 px) pour s'assurer que rien n
 - **Hydratation** : les cartes (suivi du jour, sept derniers jours, eau perdue, transpiration) se répartissent sur deux colonnes sans trou ; le rappel de profil et les conseils d'hydratation gardent la pleine largeur.
 - Contrôlé à 1400 px avec les vraies données. L'écran « Suivi » de Nutrition n'a pas pu être vu (pas de profil nutrition saisi) : il garde une seule colonne.
 - La page Profil et le Suivi nutrition restent sur une colonne : ce sont des formulaires et un journal où une colonne unique se lit bien.
+
+## Correction : trou dans les cartes d'outils du Programme
+
+- Les cinq cartes d'outils (graphique, objectif, test de contrôle, allures cibles, décalage) étaient sur une grille à deux colonnes : la rangée suivait la carte la plus haute, d'où un grand vide entre le graphique et « Mon test de contrôle ».
+- Elles sont maintenant dans deux colonnes indépendantes (`plan__tools` et `plan__col`) : graphique et objectif à gauche, test, allures et décalage à droite. Sans trou, et déplier une carte ne déplace pas les autres (une première version en colonnes CSS faisait sauter une carte d'une colonne à l'autre).
+- Une seule colonne sur téléphone, dans le même ordre qu'avant.

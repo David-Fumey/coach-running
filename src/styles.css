@@ -932,6 +932,12 @@ button {
   gap: 1rem;
 }
 
+.plan__tools,
+.plan__col {
+  display: grid;
+  gap: 1rem;
+}
+
 .plan .warnings {
   margin: 0;
 }
@@ -3991,8 +3997,17 @@ body {
 
   /* Programme : les cartes d'outils par deux, la liste des semaines en pleine largeur. */
   .plan {
+    gap: 1.25rem;
+  }
+
+  /* Deux colonnes de cartes indépendantes : pas de trou entre des cartes de hauteurs différentes, et une carte ouverte ne déplace pas les autres. */
+  .plan__tools {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+    gap: 1.25rem;
+  }
+
+  .plan__col {
     gap: 1.25rem;
   }
 

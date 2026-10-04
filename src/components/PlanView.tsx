@@ -72,15 +72,21 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
         </section>
       )}
 
+      <div className="plan__tools">
+        <div className="plan__col">
       <VolumeChart weeks={plan.weeks} currentIndex={currentIndex} doneIds={done} />
 
       <GoalCard key={goal ? goal.minutes : "aucun"} race={plan.input.race} goal={goal} model={paces} onChange={onChangeGoal} />
+        </div>
 
+        <div className="plan__col">
       {testCard}
 
       <PaceCard model={paces} manual={paceRef} onChangeManual={onChangePaceRef} />
 
       <ShiftCard plan={plan} done={done} canUndo={canUndoShift} onShift={onShift} onUndo={onUndoShift} />
+        </div>
+      </div>
 
       <section className="weeks">
         {plan.weeks.map((w) => (
