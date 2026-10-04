@@ -313,6 +313,21 @@ export function legacyTempoWorkout(km: number): Workout {
 
 /** Distance totale de la séance de test : 2 km d'échauffement, 5 km chronométrés, 1 km de retour au calme. */
 export const TEST_SESSION_KM = 8;
+/** Distance prévue de la séance « 30 minutes à fond » : 2 km d'échauffement, environ 6 km, 1 km de retour au calme. */
+export const TEST30_SESSION_KM = 9;
+
+/** Test de la phase : un 5 km au début de la construction, 30 minutes à fond au début de la phase spécifique. */
+export function testBuilt(phase: Phase): { built: Built; km: number } {
+  return phase === "specifique" ? { built: testWorkout30(), km: TEST30_SESSION_KM } : { built: testWorkout(), km: TEST_SESSION_KM };
+}
+
+export function testWorkout30(): Built {
+  return {
+    title: "Test 30 minutes",
+    details: `${WARM}30 minutes à fond mais régulières : pars à l'allure que tu penses tenir jusqu'au bout et accélère sur les dernières minutes s'il te reste du jus${COOL} Note la distance parcourue pendant les 30 minutes (ta montre l'indique) : elle recale tes allures cibles. Évite une grosse séance la veille.`,
+    workout: { format: "test-30", warmKm: 2, coolKm: 1, sets: [{ times: 1, work: { seconds: 1800, intensity: "test" } }] },
+  };
+}
 
 export function testWorkout(): Built {
   return {
@@ -382,8 +397,8 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
     if (!w.isRecovery && w.sessions.some((s) => s.type === "long")) longRank.set(w.phase, longN + 1);
     const sessions = w.sessions.map((s) => {
       if (s === testTarget) {
-        const t = testWorkout();
-        return { ...s, type: "test" as const, km: TEST_SESSION_KM, title: t.title, details: t.details, workout: t.workout };
+        const t = testBuilt(w.phase);
+        return { ...s, type: "test" as const, km: t.km, title: t.built.title, details: t.built.details, workout: t.built.workout };
       }
       let built: Built | null = null;
       const second = s.type === "tempo" || (s.type === "quality" && s !== mainQuality);

@@ -212,7 +212,7 @@ export default function App() {
   const planGoal = plan && goal && goal.race === plan.input.race ? goal : null;
   const paces = paceModel(activities, todayISO(), paceRef, planGoal, latestTest(tests));
 
-  function saveTest(r: { date: string; minutes: number; sessionId?: string }) {
+  function saveTest(r: { date: string; minutes: number; km?: number; sessionId?: string }) {
     const id = `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     setTests((prev) => withTest(prev, { id, ...r }));
   }
@@ -223,7 +223,7 @@ export default function App() {
         activities={activities}
         tests={tests}
         model={paces}
-        preview={(minutes) => paceModel(activities, todayISO(), paceRef, planGoal, { id: "apercu", date: todayISO(), minutes })}
+        preview={(minutes, km) => paceModel(activities, todayISO(), paceRef, planGoal, { id: "apercu", date: todayISO(), minutes, ...(km !== undefined ? { km } : {}) })}
         manualPace={paceRef !== null}
         onSave={saveTest}
         onDelete={(id) => setTests((prev) => prev.filter((t) => t.id !== id))}

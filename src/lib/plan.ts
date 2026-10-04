@@ -1,7 +1,7 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
 import { weekExtras } from "./strength.ts";
-import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout, TEST_SESSION_KM, testWorkout } from "./workouts.ts";
+import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout, testBuilt } from "./workouts.ts";
 
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
 export type Level = "debutant" | "intermediaire" | "avance";
@@ -407,9 +407,10 @@ export function generatePlan(input: PlanInput): Plan {
           case "quality":
             km = qualityKm;
             if (testHere) {
-              km = TEST_SESSION_KM;
+              const t = testBuilt(phase);
+              km = t.km;
               isTest = true;
-              content = testWorkout();
+              content = t.built;
             } else content = walking ? fartlekWalk(round05(km)) : qualityWorkout(race, phase, round05(km), phaseRank, level);
             break;
           case "tempo":

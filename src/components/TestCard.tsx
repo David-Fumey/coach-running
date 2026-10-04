@@ -3,8 +3,8 @@ import type { Plan } from "../lib/plan";
 import type { Activity } from "../lib/activities";
 import type { PaceModel } from "../lib/paces";
 import { zoneRange } from "../lib/paces";
-import { latestTest, nextTestSession, parseTestTime, pendingTest, type TestResult } from "../lib/tests";
-import { fmtClock, fmtDate } from "../lib/format";
+import { TEST30_MINUTES, latestTest, nextTestSession, parseTestDistance, parseTestTime, pendingTest, testKindOf, testKm, type TestResult } from "../lib/tests";
+import { fmtClock, fmtDate, fmtKm } from "../lib/format";
 import { fmtRange } from "./PaceCard";
 import { todayISO } from "../storage";
 
@@ -14,11 +14,11 @@ interface Props {
   tests: TestResult[];
   /** Modèle d'allures actuel */
   model: PaceModel | null;
-  /** Modèle d'allures qu'on aurait avec ce temps sur 5 km (pour montrer l'effet avant d'enregistrer) */
-  preview: (minutes: number) => PaceModel | null;
+  /** Modèle d'allures qu'on aurait avec ce résultat (pour montrer l'effet avant d'enregistrer) */
+  preview: (minutes: number, km?: number) => PaceModel | null;
   /** Allure moyenne saisie à la main : elle reste prioritaire sur le test */
   manualPace: boolean;
-  onSave: (result: { date: string; minutes: number; sessionId?: string }) => void;
+  onSave: (result: { date: string; minutes: number; km?: number; sessionId?: string }) => void;
   onDelete: (id: string) => void;
   /** Accueil : seulement l'invitation à renseigner le temps ; Programme : aussi le dernier test et le prochain */
   summary: boolean;
@@ -35,6 +35,8 @@ export default function TestCard({ plan, activities, tests, model, preview, manu
   const [text, setText] = useState("");
   const [error, setError] = useState("");
 
+  const thirty = pending?.kind === "30min";
+
   function saveMinutes(minutes: number) {
     if (!pending) return;
     onSave({ date: pending.session.date, minutes, sessionId: pending.session.id });
@@ -44,14 +46,23 @@ export default function TestCard({ plan, activities, tests, model, preview, manu
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    if (!pending) return;
+    if (thirty) {
+      const km = parseTestDistance(text);
+      if (km === null) return setError("Indique la distance parcourue en 30 minutes, entre 2,5 et 10 km, par exemple 6,8.");
+      onSave({ date: pending.session.date, minutes: TEST30_MINUTES, km, sessionId: pending.session.id });
+      setText("");
+      setError("");
+      return;
+    }
     const minutes = parseTestTime(text);
     if (minutes === null) return setError("Indique ton temps sur les 5 km entre 15:00 et 60:00, par exemple 24:30.");
     saveMinutes(minutes);
   }
 
-  function effect(minutes: number) {
+  function effect(minutes: number, km?: number) {
     const before = easyOf(model);
-    const after = easyOf(preview(minutes));
+    const after = easyOf(preview(minutes, km));
     if (!after) return null;
     return (
       <p className="hint">
@@ -66,11 +77,13 @@ export default function TestCard({ plan, activities, tests, model, preview, manu
     return (
       <section className="card test-card" aria-labelledby="test-title">
         <p className="eyebrow">
-          <span id="test-title">Test de 5 km</span>
+          <span id="test-title">{thirty ? "Test de 30 minutes" : "Test de 5 km"}</span>
         </p>
-        <h2 className="card__title">Quel a été ton temps ?</h2>
-        <p className="hint">Séance du {when}. Ton temps sur les 5 km chronométrés recale tes allures cibles.</p>
-        {pending.stravaMinutes !== undefined && (
+        <h2 className="card__title">{thirty ? "Quelle distance as-tu parcourue ?" : "Quel a été ton temps ?"}</h2>
+        <p className="hint">
+          Séance du {when}. {thirty ? "La distance parcourue pendant les 30 minutes à fond recale tes allures cibles (ta montre l'indique)." : "Ton temps sur les 5 km chronométrés recale tes allures cibles."}
+        </p>
+        {!thirty && pending.stravaMinutes !== undefined && (
           <div className="test-card__strava">
             <p>
               Strava a relevé <strong>{fmtClock(pending.stravaMinutes)}</strong> sur ton meilleur 5 km de cette sortie.
@@ -84,13 +97,14 @@ export default function TestCard({ plan, activities, tests, model, preview, manu
             <p className="hint">Si ton test n'est pas ce meilleur 5 km, saisis ton temps ci-dessous.</p>
           </div>
         )}
-        {pending.stravaMinutes === undefined && pending.activity && (
+        {!thirty && pending.stravaMinutes === undefined && pending.activity && (
           <p className="hint">Strava n'a pas encore détaillé cette sortie : relance la synchronisation depuis le Profil, ou saisis ton temps.</p>
         )}
         <form className="test-card__form" onSubmit={submit}>
           <div className="field">
-            <label htmlFor="test-time">Temps sur les 5 km</label>
-            <input id="test-time" type="text" inputMode="numeric" placeholder="24:30" value={text} onChange={(e) => setText(e.target.value)} />
+            <label htmlFor="test-time">{thirty ? "Distance parcourue en 30 minutes (km)" : "Temps sur les 5 km"}</label>
+            <input id="test-time" type="text" inputMode={thirty ? "decimal" : "numeric"} placeholder={thirty ? "6,8" : "24:30"} value={text} onChange={(e) => setText(e.target.value)} />
+            {thirty && text.trim() !== "" && parseTestDistance(text) !== null && effect(TEST30_MINUTES, parseTestDistance(text)!)}
           </div>
           {error && (
             <p className="error" role="alert">
@@ -110,11 +124,11 @@ export default function TestCard({ plan, activities, tests, model, preview, manu
   if (!summary || (!last && !next)) return null;
   return (
     <section className="card test-card" aria-labelledby="test-sum-title">
-      <h2 id="test-sum-title" className="card__title">Mon test de 5 km</h2>
+      <h2 id="test-sum-title" className="card__title">Mon test de contrôle</h2>
       {last ? (
         <>
           <p>
-            Dernier test : <strong>{fmtClock(last.minutes)}</strong> le {fmtDate(last.date, { day: "numeric", month: "long" })}.
+            Dernier test : <strong>{last.km !== undefined ? `${fmtKm(testKm(last))} km en 30 min` : `5 km en ${fmtClock(last.minutes)}`}</strong> le {fmtDate(last.date, { day: "numeric", month: "long" })}.
           </p>
           <p className="hint">
             {model?.reference.source === "test"
@@ -134,7 +148,7 @@ export default function TestCard({ plan, activities, tests, model, preview, manu
       )}
       {next && (
         <p className="hint">
-          Prochain test : {fmtDate(next.date, { weekday: "long", day: "numeric", month: "long" })}. Il recalera tes allures.
+          Prochain test ({testKindOf(next) === "30min" ? "30 minutes à fond" : "5 km chronométré"}) : {fmtDate(next.date, { weekday: "long", day: "numeric", month: "long" })}. Il recalera tes allures.
         </p>
       )}
     </section>

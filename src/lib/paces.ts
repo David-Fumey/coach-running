@@ -7,7 +7,7 @@
 // ses allures sous-estimées, un autre qui court toujours vite les verra surestimées.
 
 import type { Intensity, Plan, RaceKey, Session, Workout } from "./plan.ts";
-import { TEST_FRESH_DAYS, TEST_KM, type TestResult } from "./tests.ts";
+import { TEST_FRESH_DAYS, testKm, type TestResult } from "./tests.ts";
 import { diffDays } from "./plan.ts";
 import type { Activity } from "./activities.ts";
 import { RACE_KM, goalPace, vdotFromRace, type Goal } from "./goal.ts";
@@ -163,8 +163,8 @@ const clampVdot = (v: number) => Math.min(VDOT_BOUNDS.max, Math.max(VDOT_BOUNDS.
  */
 export function paceModel(activities: Activity[], today: string, manual: number | null, goal: Goal | null = null, test: TestResult | null = null): PaceModel | null {
   const fromTest = (t: TestResult): PaceModel => {
-    const vdot = clampVdot(vdotFromRace(TEST_KM, t.minutes));
-    return { reference: { pace: paceAt(vdot, AVERAGE_FRACTION), source: "test", runs: 1, km: TEST_KM, test: t }, vdot, goal };
+    const vdot = clampVdot(vdotFromRace(testKm(t), t.minutes));
+    return { reference: { pace: paceAt(vdot, AVERAGE_FRACTION), source: "test", runs: 1, km: testKm(t), test: t }, vdot, goal };
   };
   const fresh = test !== null && diffDays(test.date, today) <= TEST_FRESH_DAYS;
   if (isValidPace(manual)) return { reference: { pace: manual, source: "manuelle", runs: 0, km: 0 }, vdot: vdotFromAveragePace(manual), goal };

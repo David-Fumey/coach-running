@@ -103,7 +103,7 @@ export function workoutBlocks(plan: Plan, session: Session, model: PaceModel | n
       const effort = INTENSITY_EFFORT[seg.intensity];
       return {
         kind: seg.intensity === "facile" ? "easy" : "work",
-        label: runWalk && seg.intensity === "facile" ? "Course facile" : label(seg.intensity),
+        label: runWalk && seg.intensity === "facile" ? "Course facile" : seg.intensity === "test" && seg.seconds !== undefined ? "Test 30 minutes" : label(seg.intensity),
         ...size,
         pace,
         paceMode: "fourchette",

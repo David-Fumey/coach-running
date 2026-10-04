@@ -72,7 +72,7 @@ export default function PaceCard({ model, manual, onChangeManual }: Props) {
             {ref.source === "objectif" && <>Calculées à partir de ton temps objectif, faute de sorties enregistrées. Dès que tu auras couru, elles s'appuieront sur tes sorties.</>}
             {ref.source === "test" && ref.test && (
               <>
-                Calculées à partir de ton test de 5 km du {fmtDate(ref.test.date, { day: "numeric", month: "long" })} : {fmtClock(ref.test.minutes)}. Un test donne une base plus précise que la moyenne de tes sorties.
+                Calculées à partir de ton test {ref.test.km !== undefined ? `de 30 minutes (${fmtKm(ref.test.km)} km)` : `de 5 km (${fmtClock(ref.test.minutes)})`} du {fmtDate(ref.test.date, { day: "numeric", month: "long" })}. Un test donne une base plus précise que la moyenne de tes sorties.
               </>
             )}
             {ref.source === "manuelle" && <>Calculées à partir de l'allure moyenne que tu as saisie : {fmtPace(ref.pace)} /km.</>}
