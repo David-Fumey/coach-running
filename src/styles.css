@@ -1409,7 +1409,7 @@ button {
   justify-items: center;
   align-content: center;
   border: 1px solid var(--line);
-  border-bottom: 5px solid var(--p-affutage);
+  border-bottom: 3px solid var(--p-affutage);
   border-radius: 0.75rem;
   background: var(--surface);
   color: var(--ink);
@@ -1436,9 +1436,9 @@ button {
 }
 
 .day[aria-pressed="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--bg);
+  background: var(--p-construction);
+  border-color: var(--p-construction);
+  color: #fff;
 }
 
 .day--today .day__num {
@@ -1455,7 +1455,7 @@ button {
 .day__num {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   line-height: 1.1;
 }
 
@@ -1797,9 +1797,9 @@ button {
 }
 
 .chip-btn[aria-pressed="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--bg);
+  background: var(--p-construction);
+  border-color: var(--p-construction);
+  color: #fff;
   font-weight: 600;
 }
 
@@ -1809,7 +1809,7 @@ button {
 }
 
 .phase-card {
-  border-left: 5px solid var(--accent);
+  border-left: 3px solid var(--accent);
 }
 
 .topics {
@@ -1820,7 +1820,7 @@ button {
 .topics__title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   line-height: 1.1;
 }
 
@@ -1832,7 +1832,7 @@ button {
 .topic {
   --c: var(--accent);
   border: 1px solid var(--line);
-  border-left: 5px solid var(--c);
+  border-left: 3px solid var(--c);
   border-radius: var(--r);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -1966,7 +1966,7 @@ button {
 }
 
 .suggest {
-  border-left: 5px solid var(--accent);
+  border-left: 3px solid var(--accent);
 }
 
 .criteria {
@@ -1994,7 +1994,7 @@ button {
 
 .recipe {
   border: 1px solid var(--line);
-  border-left: 5px solid var(--done);
+  border-left: 3px solid var(--done);
   border-radius: var(--r);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -2442,7 +2442,7 @@ button {
 .readout__grid dd {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
@@ -2793,7 +2793,7 @@ button {
 .goal-card__time {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 2.75rem;
+  font-size: 2.25rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -2966,7 +2966,7 @@ button {
 .hydro__amount {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -3123,7 +3123,7 @@ button {
 .hydro__loss {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 2.25rem;
+  font-size: 1.9rem;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -3264,7 +3264,7 @@ button {
   gap: 0.875rem;
   padding: 1rem 1.125rem;
   border: 1px solid var(--line);
-  border-left: 5px solid var(--p-construction);
+  border-left: 3px solid var(--p-construction);
   border-radius: var(--r);
   background: var(--surface);
   box-shadow: var(--shadow);
