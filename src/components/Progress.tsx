@@ -32,6 +32,7 @@ const SCOPES: { id: Scope; label: string }[] = [
 ];
 
 const GRAINS: { id: Grain; label: string }[] = [
+  { id: "jour", label: "Jours" },
   { id: "semaine", label: "Semaines" },
   { id: "mois", label: "Mois" },
   { id: "annee", label: "Années" },
@@ -94,7 +95,7 @@ export default function Progress({ plan, done, activities }: Props) {
 
   const range =
     view.length > 0
-      ? `${fmtDate(view[0].start, { day: "numeric", month: "short", year: grain === "semaine" ? undefined : "numeric" })} – ${fmtDate(view[view.length - 1].end, { day: "numeric", month: "short", year: "numeric" })}`
+      ? `${fmtDate(view[0].start, { day: "numeric", month: "short", year: grain === "jour" || grain === "semaine" ? undefined : "numeric" })} – ${fmtDate(view[view.length - 1].end, { day: "numeric", month: "short", year: "numeric" })}`
       : "";
 
   return (

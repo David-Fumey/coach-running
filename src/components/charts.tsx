@@ -30,6 +30,7 @@ function useWidth<T extends HTMLElement>() {
 
 /** Étiquette courte sous l'axe. */
 export function tickLabel(b: Bucket, grain: Grain, index: number): string {
+  if (grain === "jour") return fmtDate(b.start, { day: "numeric", month: "short" });
   if (grain === "annee") return b.start.slice(0, 4);
   if (grain === "semaine") return fmtDate(b.start, { day: "numeric", month: "short" });
   const month = fmtDate(b.start, { month: "short" });
@@ -38,6 +39,7 @@ export function tickLabel(b: Bucket, grain: Grain, index: number): string {
 
 /** Libellé complet d'une période. */
 export function periodLabel(b: Bucket, grain: Grain): string {
+  if (grain === "jour") return fmtDate(b.start, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   if (grain === "annee") return b.start.slice(0, 4);
   if (grain === "mois") return fmtDate(b.start, { month: "long", year: "numeric" });
   return `Semaine du ${fmtDate(b.start, { day: "numeric", month: "short" })} au ${fmtDate(b.end, { day: "numeric", month: "short", year: "numeric" })}`;
