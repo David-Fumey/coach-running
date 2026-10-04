@@ -29,6 +29,23 @@ export interface RunDetail {
   elapsedMinutes?: number;
   /** Montre ou appareil d'enregistrement */
   device?: string;
+  /** Courbes dans le temps (lues à part ; absentes tant qu'elles n'ont pas été lues) */
+  series?: Series;
+}
+
+/**
+ * Courbes d'une sortie, ramenées à une centaine de points. Les tableaux ont tous la longueur de `t`.
+ * 0 = valeur inconnue (arrêt, pas de capteur). `t` vide : courbes lues, aucune disponible.
+ */
+export interface Series {
+  /** Secondes depuis le départ */
+  t: number[];
+  /** Fréquence cardiaque, bpm */
+  hr?: number[];
+  /** Allure, secondes par km */
+  pace?: number[];
+  /** Altitude, mètres */
+  alt?: number[];
 }
 
 export interface Activity {

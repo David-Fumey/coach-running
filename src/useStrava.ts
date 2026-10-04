@@ -16,7 +16,7 @@ import {
   tokensExpired,
   type StravaState,
 } from "./lib/strava";
-import { StravaError, exchangeCode, fetchEfforts, fetchRuns, refreshTokens, type FetchLike } from "./lib/stravaClient";
+import { StravaError, exchangeCode, fetchEfforts, fetchRuns, fetchSeries, refreshTokens, type FetchLike } from "./lib/stravaClient";
 import { useStoredState } from "./storage";
 
 export type StravaStatus =
@@ -193,16 +193,27 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
         tokens = await refreshTokens(s, tokens, browserFetch);
         setState((prev) => ({ ...prev, tokens }));
       }
-      const res = await fetchEfforts(tokens.accessToken, [id], browserFetch);
-      if (res.stopped) return res.stopped.message;
-      if (res.details.size === 0) return "Strava n'a pas pu fournir le détail de cette sortie. Réessaie plus tard.";
-      setActivities(
-        applyDetails(latest.current.activities, {
+      let next = latest.current.activities;
+      // Détail (kilomètres, cadence, calories) : une requête, seulement s'il n'a pas encore été lu.
+      if (act.detail === undefined) {
+        const res = await fetchEfforts(tokens.accessToken, [id], browserFetch);
+        if (res.stopped) return res.stopped.message;
+        if (res.details.size === 0) return "Strava n'a pas pu fournir le détail de cette sortie. Réessaie plus tard.";
+        next = applyDetails(next, {
           efforts: new Map([...res.efforts].map(([n, e]) => [`strava:${n}`, e])),
           temps: new Map([...res.temps].map(([n, t]) => [`strava:${n}`, t])),
           details: new Map([...res.details].map(([n, d]) => [`strava:${n}`, d])),
-        })
-      );
+        });
+        setActivities(next);
+      }
+      // Courbes (FC, allure, altitude) : une seconde requête, une seule fois par sortie.
+      if (act.detail?.series === undefined) {
+        const res = await fetchSeries(tokens.accessToken, id, browserFetch);
+        if (res.series) {
+          const series = res.series;
+          setActivities(next.map((x) => (x.id === activityId && x.detail && x.detail.series === undefined ? { ...x, detail: { ...x.detail, series } } : x)));
+        } else if (res.stopped) return res.stopped.message;
+      }
       return null;
     } catch (e) {
       return e instanceof StravaError ? e.message : "La lecture du détail a échoué.";

@@ -70,13 +70,20 @@ function validEfforts(e: unknown): boolean {
   return isObj(e) && Object.entries(e).every(([k, v]) => EFFORT_KEYS.includes(k) && isNum(v) && v > 0);
 }
 
+function validSeries(s: unknown): boolean {
+  if (!isObj(s) || !Array.isArray(s.t) || !s.t.every(isNum)) return false;
+  const n = s.t.length;
+  return (["hr", "pace", "alt"] as const).every((k) => s[k] === undefined || (Array.isArray(s[k]) && (s[k] as unknown[]).length === n && (s[k] as unknown[]).every(isNum)));
+}
+
 function validDetail(d: unknown): boolean {
   return (
     isObj(d) &&
     Array.isArray(d.splits) &&
     d.splits.every((s) => isObj(s) && isNum(s.km) && s.km > 0 && isNum(s.seconds) && s.seconds > 0 && isOptNum(s.hr) && (s.elev === undefined || isNum(s.elev))) &&
     isOptNum(d.calories) && isOptNum(d.cadence) && isOptNum(d.elapsedMinutes) &&
-    (d.device === undefined || typeof d.device === "string")
+    (d.device === undefined || typeof d.device === "string") &&
+    (d.series === undefined || validSeries(d.series))
   );
 }
 

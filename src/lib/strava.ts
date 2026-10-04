@@ -2,7 +2,7 @@
 // voir `stravaClient.ts` pour le réseau. La réponse de Strava n'est jamais crue sur parole.
 
 import { type Plan } from "./plan.ts";
-import { addActivity, type Activity, type Efforts, type EffortKey, type RunDetail, type Split, type Tracked } from "./activities.ts";
+import { addActivity, type Activity, type Efforts, type EffortKey, type RunDetail, type Series, type Split, type Tracked } from "./activities.ts";
 
 export interface StravaTokens {
   accessToken: string;
@@ -308,6 +308,53 @@ export function parseRunDetail(raw: unknown): RunDetail | null {
   if (inRange(r.calories, 1, 20000)) out.calories = Math.round(r.calories);
   if (inRange(r.elapsed_time, 1, 48 * 3600)) out.elapsedMinutes = round2(r.elapsed_time / 60);
   if (typeof r.device_name === "string" && r.device_name.trim() !== "") out.device = r.device_name.trim().slice(0, 60);
+  return out;
+}
+
+/** Nombre de points gardés par courbe. */
+export const SERIES_POINTS = 100;
+
+const numbers = (x: unknown): number[] | null => {
+  const data = (x as { data?: unknown } | null)?.data;
+  return Array.isArray(data) && data.every((v) => typeof v === "number" && Number.isFinite(v)) ? (data as number[]) : null;
+};
+
+/**
+ * Courbes (flux Strava lus avec `key_by_type`) ramenées à SERIES_POINTS points, chaque point étant la moyenne de son
+ * tronçon de temps. Allure en secondes par km (0 sous 0,5 m/s : arrêt). Objet à `t` vide si rien d'exploitable ;
+ * null si la réponse n'est pas un objet.
+ */
+export function parseSeries(raw: unknown): Series | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const time = numbers(r.time);
+  if (!time || time.length < 2) return { t: [] };
+  const n = time.length;
+  const hr = numbers(r.heartrate);
+  const vel = numbers(r.velocity_smooth);
+  const alt = numbers(r.altitude);
+  const buckets = Math.min(SERIES_POINTS, n);
+  const out: Series = { t: [] };
+  const hrOut: number[] = [];
+  const paceOut: number[] = [];
+  const altOut: number[] = [];
+  for (let b = 0; b < buckets; b++) {
+    const from = Math.floor((b * n) / buckets);
+    const to = Math.max(from + 1, Math.floor(((b + 1) * n) / buckets));
+    const avg = (list: number[] | null, ok: (v: number) => boolean) => {
+      if (!list || list.length !== n) return 0;
+      const vals = list.slice(from, to).filter(ok);
+      return vals.length === 0 ? 0 : vals.reduce((a, v) => a + v, 0) / vals.length;
+    };
+    out.t.push(Math.round(time[to - 1]));
+    hrOut.push(Math.round(avg(hr, (v) => v >= 30 && v <= 250)));
+    const v = avg(vel, (x) => x > 0.5);
+    paceOut.push(v > 0 ? Math.round(1000 / v) : 0);
+    altOut.push(Math.round(avg(alt, () => true)));
+  }
+  if (hrOut.some((v) => v > 0)) out.hr = hrOut;
+  if (paceOut.some((v) => v > 0)) out.pace = paceOut;
+  if (alt && alt.length === n) out.alt = altOut;
   return out;
 }
 

@@ -1,8 +1,8 @@
 // Appels réseau vers Strava. Le CORS de Strava est ouvert : tout se fait depuis le navigateur, sans serveur.
 // `fetch` est injectable pour pouvoir tester sans réseau.
 
-import { parseBestEfforts, parseRunDetail, parseTemp, tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
-import type { Efforts, RunDetail } from "./activities.ts";
+import { parseBestEfforts, parseRunDetail, parseSeries, parseTemp, tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
+import type { Efforts, RunDetail, Series } from "./activities.ts";
 
 export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   ok: boolean;
@@ -153,4 +153,23 @@ export async function fetchEfforts(
     onProgress?.(efforts.size, ids.length);
   }
   return { efforts, temps, details, stopped: null };
+}
+
+export interface SeriesResult {
+  series: Series | null;
+  stopped: StravaError | null;
+}
+
+/**
+ * Lit les courbes (temps, FC, vitesse, altitude) d'une activité : une requête. Activité introuvable ou sans flux
+ * (404) : courbes vides, pour ne pas la redemander. Autre erreur : rien n'est marqué, on réessaiera.
+ */
+export async function fetchSeries(accessToken: string, id: number, fetchFn: FetchLike): Promise<SeriesResult> {
+  try {
+    const body = await call(fetchFn, `${ACTIVITY_URL}/${id}/streams?keys=time,heartrate,velocity_smooth,altitude&key_by_type=true`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    return { series: parseSeries(body) ?? { t: [] }, stopped: null };
+  } catch (e) {
+    if (e instanceof StravaError && e.kind === "reponse") return { series: e.status === 404 ? { t: [] } : null, stopped: e.status === 404 ? null : e };
+    return { series: null, stopped: e instanceof StravaError ? e : new StravaError("reseau", "Strava est injoignable. Vérifie ta connexion et réessaie.") };
+  }
 }

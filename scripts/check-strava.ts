@@ -2,10 +2,10 @@ import { generatePlan } from "../src/lib/plan.ts";
 import { addActivity, removeActivity, type Activity, type Tracked } from "../src/lib/activities.ts";
 import { makeBackup, parseBackup, EMPTY_SNAPSHOT } from "../src/lib/backup.ts";
 import {
-  EMPTY_STRAVA, RECENT_TEMP_COUNT, applyDetails, applyEfforts, detailTargets, parseRunDetail, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
+  EMPTY_STRAVA, RECENT_TEMP_COUNT, applyDetails, applyEfforts, detailTargets, parseRunDetail, parseSeries, SERIES_POINTS, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
   type StravaRun, type StravaTokens,
 } from "../src/lib/strava.ts";
-import { StravaError, fetchEfforts, fetchRuns, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
+import { StravaError, fetchEfforts, fetchRuns, fetchSeries, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
 
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 let failures = 0;
@@ -201,6 +201,45 @@ check("activité non lue : inchangée", applyDetails(base, { efforts: new Map(),
   const broken = JSON.parse(snapText);
   broken.data.activities[0].detail.splits[0].seconds = -1;
   check("sauvegarde : détail invalide refusé", !parseBackup(JSON.stringify(broken)).ok);
+}
+
+// ---------- Courbes (FC, allure, altitude) ----------
+{
+  const n = 1000;
+  const time = Array.from({ length: n }, (_, i) => i * 3);
+  const vel = Array.from({ length: n }, (_, i) => (i < 10 ? 0.1 : 3.0));
+  const hr = Array.from({ length: n }, (_, i) => 120 + Math.floor(i / 20));
+  const alt = Array.from({ length: n }, (_, i) => 100 + (i % 50));
+  const raw = { time: { data: time }, velocity_smooth: { data: vel }, heartrate: { data: hr }, altitude: { data: alt } };
+  const se = parseSeries(raw)!;
+  check("courbes : ramenées à une centaine de points, tableaux alignés", se.t.length === SERIES_POINTS && se.hr!.length === SERIES_POINTS && se.pace!.length === SERIES_POINTS && se.alt!.length === SERIES_POINTS, se.t.length);
+  check("courbes : temps croissant jusqu'à la fin de la sortie", se.t.every((v, i) => i === 0 || v > se.t[i - 1]) && se.t[se.t.length - 1] === 2997);
+  check("courbes : allure en secondes par km, 0 à l'arrêt", se.pace![0] === 0 && se.pace![50] === 333, se.pace!.slice(0, 3));
+  check("courbes : FC moyennée par tronçon", se.hr![0] >= 120 && se.hr![99] > se.hr![0]);
+  const noHr = parseSeries({ time: { data: time }, velocity_smooth: { data: vel } })!;
+  check("courbes : sans capteur de FC, pas de courbe de FC", noHr.hr === undefined && noHr.pace !== undefined && noHr.alt === undefined);
+  const short = parseSeries({ time: { data: [0, 1, 2] }, velocity_smooth: { data: [3, 3, 3] } })!;
+  check("courbes : sortie très courte gardée telle quelle", short.t.length === 3);
+  check("courbes : sans flux de temps, objet vide mais lu", parseSeries({})!.t.length === 0 && parseSeries({ time: { data: "x" } })!.t.length === 0);
+  check("courbes : réponse illisible, null", parseSeries(null) === null && parseSeries([]) === null);
+  check("courbes : tableau de longueur différente ignoré", parseSeries({ time: { data: time }, heartrate: { data: [100, 101] } })!.hr === undefined);
+
+  const urls2: string[] = [];
+  const ok = await fetchSeries("tok", 7, async (u, init) => { urls2.push(u + "|" + init?.headers?.Authorization); return respE(200, raw); });
+  check("client : une requête, flux par type, jeton envoyé", urls2.length === 1 && urls2[0].startsWith("https://www.strava.com/api/v3/activities/7/streams?") && urls2[0].includes("key_by_type=true") && urls2[0].endsWith("|Bearer tok") && ok.series!.t.length === SERIES_POINTS && ok.stopped === null, urls2);
+  const gone = await fetchSeries("tok", 7, async () => respE(404, {}));
+  check("client : 404, courbes vides marquées lues", gone.series?.t.length === 0 && gone.stopped === null);
+  const quota = await fetchSeries("tok", 7, async () => respE(429, {}));
+  check("client : quota, rien de marqué", quota.series === null && quota.stopped?.kind === "quota");
+  const off = await fetchSeries("tok", 7, async () => { throw new Error("offline"); });
+  check("client : hors ligne, rien de marqué", off.series === null && off.stopped?.kind === "reseau");
+
+  const withSeries = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ ...dAct(1), detail: { splits: [], series: se } }], done: {}, confirmed: true }, new Date("2026-10-04T10:00:00Z"));
+  const rt = parseBackup(withSeries);
+  check("sauvegarde : les courbes survivent à l'aller-retour", rt.ok && rt.data.activities[0].detail?.series?.t.length === SERIES_POINTS, rt);
+  const bad = JSON.parse(withSeries);
+  bad.data.activities[0].detail.series.hr.pop();
+  check("sauvegarde : courbes de longueurs différentes refusées", !parseBackup(JSON.stringify(bad)).ok);
 }
 
 // ---------- Fusion ----------
