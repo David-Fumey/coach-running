@@ -1,4 +1,4 @@
-import { generatePlan, weekdayIndex } from "../src/lib/plan.ts";
+import { addDays, diffDays, generatePlan, weekdayIndex } from "../src/lib/plan.ts";
 import type { Activity } from "../src/lib/activities.ts";
 import {
   WINDOW_SIZE, bucketsOf, extrasOf, clampStart, defaultSelection, defaultStart, inScope, niceTicks, nextStart, planRange, startOf,
@@ -24,6 +24,7 @@ const today = "2026-10-20";
 check("semaine : le lundi", startOf("2026-10-07", "semaine") === "2026-10-05" && startOf("2026-10-05", "semaine") === "2026-10-05" && startOf("2026-10-11", "semaine") === "2026-10-05");
 check("semaine : à cheval sur deux mois", startOf("2026-11-01", "semaine") === "2026-10-26");
 check("mois / année", startOf("2026-10-31", "mois") === "2026-10-01" && startOf("2026-10-31", "annee") === "2026-01-01");
+check("jour : le jour même, suivant = lendemain", startOf("2026-10-07", "jour") === "2026-10-07" && nextStart("2026-10-31", "jour") === "2026-11-01" && nextStart("2026-12-31", "jour") === "2027-01-01");
 check("période suivante", nextStart("2026-12-28", "semaine") === "2027-01-04" && nextStart("2026-12-01", "mois") === "2027-01-01" && nextStart("2026-01-01", "annee") === "2027-01-01");
 check("le plan commence un lundi", weekdayIndex(from) === 0, from);
 
@@ -37,6 +38,17 @@ check("total : tout", inScope(plan, all, "total").length === 3);
 check("bornes du plan incluses", inScope(plan, [act("x", from, 5, 30), act("y", to, 5, 30), act("z", "2026-09-27", 5, 30)], "programme").length === 2);
 
 // ---------- Périodes ----------
+const days = bucketsOf(plan, [act("j1", "2026-10-06", 10, 55), act("j2", "2026-10-06", 5, 30), act("j3", "2026-10-08", 8, 48)], "programme", "jour", today);
+const d6 = days.find((b) => b.start === "2026-10-06")!;
+check("jour : une période par jour, du premier jour du plan à la course", days.length === diffDays(planRange(plan).from, planRange(plan).to) + 1 && days[0].start === planRange(plan).from && days[days.length - 1].start === planRange(plan).to, [days.length, planRange(plan)]);
+check("jour : début et fin identiques", days.every((b) => b.start === b.end));
+check("jour : deux sorties le même jour s'additionnent", d6.km === 15 && d6.minutes === 85 && d6.count === 2 && Math.abs(d6.pace! - 85 / 15) < 1e-9, d6);
+check("jour : sans sortie, zéro et sans allure", days.find((b) => b.start === "2026-10-07")!.km === 0 && days.find((b) => b.start === "2026-10-07")!.pace === null);
+check("jour : un seul jour en cours, les suivants à venir", days.filter((b) => b.current).length === 1 && days.find((b) => b.current)!.start === today && days.find((b) => b.start === addDays(today, 1))!.future && !days.find((b) => b.start === today)!.future, today);
+check("jour : kilomètres prévus du jour", days.every((b) => Math.abs((b.plannedKm ?? -1) - plan.weeks.flatMap((w) => w.sessions).filter((s) => s.date === b.start).reduce((a, s) => a + s.km, 0)) < 1e-9));
+check("jour : périodes contiguës", days.every((b, i) => i === 0 || nextStart(days[i - 1].start, "jour") === b.start));
+check("jour : la somme des jours égale celle des semaines", Math.abs(days.reduce((a, b) => a + b.km, 0) - bucketsOf(plan, [act("j1", "2026-10-06", 10, 55), act("j2", "2026-10-06", 5, 30), act("j3", "2026-10-08", 8, 48)], "programme", "semaine", today).reduce((a, b) => a + b.km, 0)) < 1e-9);
+check("jour : fenêtre d'un mois", WINDOW_SIZE.jour === 30);
 const weeks = bucketsOf(plan, all, "programme", "semaine", today);
 check("programme : une période par semaine du plan", weeks.length === plan.weeks.length, [weeks.length, plan.weeks.length]);
 check("programme : première et dernière période", weeks[0].start === from && weeks[weeks.length - 1].end >= to);

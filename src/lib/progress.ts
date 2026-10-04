@@ -1,4 +1,4 @@
-// Progrès : regroupement des activités par semaine, mois ou année. TypeScript pur, sans mise en forme
+// Progrès : regroupement des activités par jour, semaine, mois ou année. TypeScript pur, sans mise en forme
 // (les libellés dépendent de la langue et restent dans l'interface).
 
 import { addDays, parseISO, toISO, weekdayIndex, type Plan } from "./plan.ts";
@@ -6,13 +6,13 @@ import type { Activity } from "./activities.ts";
 
 /** « Programme » : les activités de la période du plan en cours. « Total » : tout ce qui est enregistré. */
 export type Scope = "programme" | "total";
-export type Grain = "semaine" | "mois" | "annee";
+export type Grain = "jour" | "semaine" | "mois" | "annee";
 
 /** Nombre de périodes affichées d'un coup ; le reste s'atteint avec les flèches. */
-export const WINDOW_SIZE: Record<Grain, number> = { semaine: 24, mois: 12, annee: 8 };
+export const WINDOW_SIZE: Record<Grain, number> = { jour: 30, semaine: 24, mois: 12, annee: 8 };
 
 export interface Bucket {
-  /** Premier jour de la période (lundi, 1er du mois ou 1er janvier) */
+  /** Premier jour de la période (le jour même, le lundi, le 1er du mois ou le 1er janvier) */
   start: string;
   /** Dernier jour de la période */
   end: string;
@@ -47,12 +47,14 @@ interface Acc {
 const newAcc = (): Acc => ({ km: 0, minutes: 0, count: 0, planned: 0, elevation: 0, hasElevation: false, hrWeighted: 0, hrMinutes: 0 });
 
 export function startOf(date: string, grain: Grain): string {
+  if (grain === "jour") return date;
   if (grain === "semaine") return addDays(date, -weekdayIndex(date));
   return grain === "mois" ? `${date.slice(0, 7)}-01` : `${date.slice(0, 4)}-01-01`;
 }
 
 /** Début de la période suivante. */
 export function nextStart(start: string, grain: Grain): string {
+  if (grain === "jour") return addDays(start, 1);
   if (grain === "semaine") return addDays(start, 7);
   const d = parseISO(start);
   if (grain === "mois") d.setUTCMonth(d.getUTCMonth() + 1);
