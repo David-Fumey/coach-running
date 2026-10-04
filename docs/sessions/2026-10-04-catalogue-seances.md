@@ -91,3 +91,11 @@
 - **Mise à jour d'un ancien plan d'avancé** : un tempo sur deux à venir devient une séance de qualité (même date, mêmes kilomètres), les séances déjà faites ne bougent pas. Le résultat est identique à un plan neuf.
 - Tests : `test:workouts` (alternance, formats différents, récupération, déroulés, intermédiaire inchangé, mise à jour d'un ancien plan d'avancé).
 - Pistes restantes : test de 30 minutes comme alternative au 5 km, charge de travail hebdomadaire (limiter les semaines à deux séances très dures d'affilée).
+
+## Test de 30 minutes (ajout)
+
+- **Alternative au 5 km** : au début de la phase spécifique, le test est « 30 minutes à fond » (2 km d'échauffement, 30 minutes régulières et soutenues, 1 km de retour au calme, 9 km prévus). Le test de la construction reste le 5 km chronométré. Raison : après plusieurs mois, un effort de 30 minutes (proche du seuil) est plus parlant pour le semi et le marathon qu'un second 5 km.
+- **Résultat** : la distance parcourue pendant les 30 minutes (ta montre l'indique), entre 2,5 et 10 km. `TestResult` gagne un champ `km` (absent pour le 5 km) ; `minutes` vaut alors 30. Le niveau se calcule de la même façon (`vdotFromRace(km, minutes)`). Pas de proposition Strava pour ce test : Strava ne relève pas de meilleur effort sur 30 minutes.
+- La carte du test adapte son titre, son champ (« 6,8 ») et montre l'effet sur l'allure facile en tapant ; le résumé du Programme et la carte « Mes allures cibles » indiquent le type de test.
+- La mise à jour d'un ancien plan place un test de 30 minutes dans la phase spécifique et un 5 km dans la construction.
+- Tests : `test:control` étendu (distance valide ou non, niveau tiré du 30 minutes, pas de proposition Strava, déroulé, sauvegarde).
