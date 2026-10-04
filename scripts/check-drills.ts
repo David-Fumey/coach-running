@@ -1,6 +1,6 @@
 import { VIEW, layout, points } from "../src/lib/figures.ts";
 import { POSES } from "../src/lib/poses.ts";
-import { DRILLS, GUIDE, ZONE_LABEL, doseLabel, drillSeconds, drillsOf, stretchRoutine, warmupRoutine, type Drill } from "../src/lib/drills.ts";
+import { DRILLS, GUIDE, ZONE_LABEL, doseLabel, drillSeconds, drillsOf, routinesFor, stretchRoutine, warmupRoutine, type Drill } from "../src/lib/drills.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -53,6 +53,12 @@ check("la version courte est incluse dans la complète", short.drills.length >= 
 check("la complète est plus longue que la courte", full.minutes > short.minutes, [short.minutes, full.minutes]);
 check("durées d'étirements raisonnables", short.minutes >= 3 && short.minutes <= 10 && full.minutes <= 20, [short.minutes, full.minutes]);
 check("la version courte couvre mollets, cuisses, ischios, fessiers, hanches", ["mollets", "cuisses", "ischios", "fessiers", "hanches"].every((z) => short.drills.some((d) => d.zone === z)));
+
+// ---------- Routines selon la séance ----------
+check("séance rapide : échauffement avec gammes, étirements complets", (() => { const r = routinesFor("quality"); return r.fast && r.warmup.drills.some((d) => d.id === "accelerations") && r.stretch.drills.length === full.drills.length; })());
+check("footing : échauffement simple, étirements courts", (() => { const r = routinesFor("easy"); return !r.fast && r.warmup.drills.every((d) => !d.fast) && r.stretch.drills.length === short.drills.length; })());
+check("sortie longue : échauffement simple, étirements complets", (() => { const r = routinesFor("long"); return !r.fast && r.stretch.drills.length === full.drills.length; })());
+check("tempo, test et course sont des séances rapides", ["tempo", "test", "race"].every((t) => routinesFor(t).fast));
 
 // ---------- Illustrations ----------
 check("chaque exercice a une ou deux images", DRILLS.every((d) => (POSES[d.id]?.length ?? 0) >= 1 && POSES[d.id].length <= 2), DRILLS.filter((d) => !POSES[d.id]).map((d) => d.id));

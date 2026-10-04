@@ -395,3 +395,10 @@ export const GUIDE: Record<DrillKind, { title: string; lead: string; rules: stri
     ],
   },
 };
+
+/** Routines adaptées à un type de séance (`Session["type"]` du plan) : échauffement avant, étirements après. */
+export function routinesFor(type: string): { warmup: Routine; stretch: Routine; fast: boolean; fullStretch: boolean } {
+  const fast = type === "quality" || type === "tempo" || type === "test" || type === "race";
+  const fullStretch = fast || type === "long";
+  return { warmup: warmupRoutine(fast), stretch: stretchRoutine(fullStretch), fast, fullStretch };
+}

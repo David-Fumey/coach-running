@@ -10,6 +10,7 @@ import { PaceLine } from "./PaceCard";
 import WorkoutSteps from "./WorkoutSteps";
 import StrengthSteps from "./StrengthSteps";
 import RestCard from "./RestCard";
+import SessionDrills from "./SessionDrills";
 import type { PaceModel } from "../lib/paces";
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
   onLog: (sessionId?: string) => void;
   onOpenProgram: () => void;
   onOpenProgress: () => void;
+  onOpenDrills: () => void;
   onToggle: (id: string) => void;
   paces: PaceModel | null;
   /** Invitation à renseigner le temps d'un test de 5 km, s'il y en a un à saisir */
@@ -40,7 +42,7 @@ const TYPE_LABEL: Record<Session["type"], string> = {
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 /** Accueil du hub : la prochaine séance, la semaine en cours et quelques chiffres. */
-export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, onToggle, paces, testCard }: Props) {
+export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, onOpenDrills, onToggle, paces, testCard }: Props) {
   const today = todayISO();
   const week = plan.weeks[currentWeekIndex(plan, today)];
   const allSessions = plan.weeks.flatMap((w) => w.sessions);
@@ -98,6 +100,7 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
             <p className="session__details">{next.details}</p>
             <PaceLine plan={plan} model={paces} session={next} />
             <WorkoutSteps plan={plan} model={paces} session={next} />
+            <SessionDrills type={next.type} onOpenDrills={onOpenDrills} />
             <div className="actions">
               <button type="button" className="btn btn--primary" onClick={() => onLog(next.id)}>
                 Enregistrer cette séance
