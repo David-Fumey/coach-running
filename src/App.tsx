@@ -314,6 +314,7 @@ export default function App() {
             onLog={logSession}
             onOpenProgram={() => goTo("programme")}
             onOpenProgress={() => goTo("progres")}
+            onToggle={toggle}
             paces={paces}
             testCard={testCard(false)}
           />

@@ -5,6 +5,7 @@
 // ensuite l'affichage pas à pas. Le format change d'une séance à l'autre (rotation) et s'allonge d'un cycle à l'autre
 // (progression) ; le nombre de répétitions suit les kilomètres de la séance, donc le volume de la semaine.
 
+import { weekExtras } from "./strength.ts";
 import type { Intensity, Level, Phase, Plan, PlanInput, RaceKey, Rest, Seg, Session, Workout, WorkSet } from "./plan.ts";
 
 export interface Built {
@@ -336,11 +337,12 @@ const trainingWeeksOf = (plan: Plan) => plan.weeks.filter((w) => w.phase !== "af
 export function upgradableCount(plan: Plan, done: Record<string, boolean>, today: string): number {
   const next = upgradePlan(plan, done, today);
   let n = 0;
-  next.weeks.forEach((w, i) =>
+  next.weeks.forEach((w, i) => {
     w.sessions.forEach((s, j) => {
       if (s !== plan.weeks[i].sessions[j]) n++;
-    })
-  );
+    });
+    n += (w.extras?.length ?? 0) - (plan.weeks[i].extras?.length ?? 0);
+  });
   return n;
 }
 
@@ -359,6 +361,7 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
   const trainingWeeks = trainingWeeksOf(plan);
   const walkWeeks = runWalkWeeks(trainingWeeks);
   const testsEnabled = trainingWeeks >= 8;
+  let strengthRank = 0;
   const tested = new Set<Phase>(plan.weeks.filter((w) => w.sessions.some((s) => s.type === "test")).map((w) => w.phase));
   const weeks = plan.weeks.map((w) => {
     const walking = runWalk && w.index < walkWeeks;
@@ -388,7 +391,14 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
       } else built = runWalkWorkout(s.km, stage, false);
       return built ? { ...s, title: built.title, details: built.details, workout: built.workout } : s;
     });
-    return testTarget ? { ...w, sessions, totalKm: r05(sessions.reduce((acc, x) => acc + x.km, 0)) } : { ...w, sessions };
+    // Renforcement et mobilité les jours sans course, pour les semaines qui n'en ont pas encore.
+    const placed = w.paused
+      ? { sessions: [] as Session[], nextRank: strengthRank }
+      : weekExtras({ weekStart: w.startDate, phase: w.phase, isRecovery: w.isRecovery, isRaceWeek: w.phase === "course", level, runs: sessions.map((s) => ({ date: s.date, type: s.type })) }, strengthRank);
+    strengthRank = placed.nextRank;
+    const added = w.extras ? [] : placed.sessions.filter((s) => s.date >= today);
+    const extras = added.length > 0 ? { extras: added } : {};
+    return testTarget ? { ...w, sessions, totalKm: r05(sessions.reduce((acc, x) => acc + x.km, 0)), ...extras } : { ...w, sessions, ...extras };
   });
   return { ...plan, weeks };
 }

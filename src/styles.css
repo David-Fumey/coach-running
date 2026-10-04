@@ -3394,3 +3394,24 @@ button {
   font-weight: 700;
   color: var(--focus);
 }
+
+/* ---------- Renforcement et repos ---------- */
+
+.wo-step--stride .wo-step__kind {
+  color: var(--p-construction);
+}
+
+.rest-card__tips {
+  margin: 0.5rem 0 0;
+  padding-left: 1.125rem;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.rest-card__tips li::marker {
+  color: var(--done);
+}
+
+.session--strength {
+  border-left-color: var(--p-construction);
+}

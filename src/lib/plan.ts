@@ -1,5 +1,6 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
+import { weekExtras } from "./strength.ts";
 import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout, TEST_SESSION_KM, testWorkout } from "./workouts.ts";
 
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
@@ -14,6 +15,7 @@ export type SessionType =
   | "recovery"
   | "shakeout"
   | "test"
+  | "strength"
   | "race";
 
 export interface PlanInput {
@@ -67,6 +69,26 @@ export interface Workout {
   note?: string;
 }
 
+/** Un exercice de renforcement : séries de répétitions ou de tenues (secondes), par côté si `perSide`. */
+export interface Exercise {
+  name: string;
+  tip: string;
+  sets: number;
+  reps?: number;
+  seconds?: number;
+  perSide?: boolean;
+}
+
+/** Séance de renforcement ou de mobilité : une série d'exercices sans matériel. */
+export interface StrengthWorkout {
+  format: "renforcement" | "mobilite";
+  routine: "jambes" | "gainage" | "mobilite";
+  minutes: number;
+  /** Récupération entre deux séries, en secondes */
+  restSeconds: number;
+  exercises: Exercise[];
+}
+
 export interface Session {
   id: string;
   date: string;
@@ -76,6 +98,8 @@ export interface Session {
   details: string;
   /** Absent des plans créés avant le catalogue de séances */
   workout?: Workout;
+  /** Séance de renforcement (type « strength ») */
+  strength?: StrengthWorkout;
 }
 
 export interface Week {
@@ -88,6 +112,8 @@ export interface Week {
   sessions: Session[];
   /** Semaine de pause créée par un décalage du programme */
   paused?: boolean;
+  /** Renforcement et mobilité, rangés à part : pas de kilomètres, pas une séance de course */
+  extras?: Session[];
 }
 
 export interface Plan {
@@ -282,6 +308,7 @@ export function generatePlan(input: PlanInput): Plan {
   // Un test de 5 km au début de la construction et de la phase spécifique (si la préparation dure au moins 8 semaines).
   const testsEnabled = trainingWeeks >= 8;
   const testedPhases = new Set<Phase>();
+  let strengthRank = 0;
 
   for (let w = 0; w < totalWeeks; w++) {
     const weekStart = addDays(start, w * 7);
@@ -411,6 +438,10 @@ export function generatePlan(input: PlanInput): Plan {
 
     // Les séances déjà passées (début de plan en cours de semaine) sont ignorées.
     const kept = sessions.filter((s) => diffDays(today, s.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+    // Renforcement et mobilité les jours sans course (placés d'après toutes les séances de la semaine, passées comprises).
+    const placed = weekExtras({ weekStart, phase, isRecovery, isRaceWeek, level, runs: sessions.map((s) => ({ date: s.date, type: s.type })) }, strengthRank);
+    strengthRank = placed.nextRank;
+    const extras = placed.sessions.filter((s) => diffDays(today, s.date) >= 0);
 
     weeks.push({
       index: w,
@@ -420,6 +451,7 @@ export function generatePlan(input: PlanInput): Plan {
       focus: isRecovery ? "Semaine allégée pour assimiler les efforts des semaines précédentes." : FOCUS[phase],
       totalKm: round05(kept.reduce((acc, s) => acc + s.km, 0)),
       sessions: kept,
+      ...(extras.length > 0 ? { extras } : {}),
     });
   }
 

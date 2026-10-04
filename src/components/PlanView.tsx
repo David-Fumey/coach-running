@@ -7,6 +7,7 @@ import { CheckIcon } from "./icons";
 import PaceCard, { PaceLine } from "./PaceCard";
 import GoalCard from "./GoalCard";
 import WorkoutSteps from "./WorkoutSteps";
+import StrengthSteps from "./StrengthSteps";
 import { upgradableCount } from "../lib/workouts";
 import ShiftCard from "./ShiftCard";
 import type { Goal } from "../lib/goal";
@@ -61,7 +62,7 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
         <section className="card upgrade-card" aria-labelledby="upgrade-title">
           <h2 id="upgrade-title" className="card__title">Nouvelles séances disponibles</h2>
           <p className="hint">
-            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sorties longues variées et tests de 5 km, avec l'allure de chaque portion. Les dates et les séances déjà faites ne changent pas ; les kilomètres non plus, sauf la semaine d'un test.
+            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sorties longues variées, tests de 5 km et renforcement les jours sans course, avec l'allure de chaque portion. Les dates et les séances déjà faites ne changent pas ; les kilomètres non plus, sauf la semaine d'un test.
           </p>
           <div className="actions">
             <button type="button" className="btn btn--primary" onClick={onUpgrade}>
@@ -108,7 +109,9 @@ interface WeekProps {
 }
 
 function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekProps) {
-  const doneCount = week.sessions.filter((s) => done[s.id]).length;
+  // Courses, renforcement et mobilité, dans l'ordre des jours.
+  const entries = [...week.sessions, ...(week.extras ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  const doneCount = entries.filter((s) => done[s.id]).length;
   const end = addDays(week.startDate, 6);
   const range = `${fmtDate(week.startDate, { day: "numeric", month: "short" })} au ${fmtDate(end, { day: "numeric", month: "short" })}`;
 
@@ -120,13 +123,29 @@ function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekP
         <span className="week__phase">{week.paused ? "Pause" : week.isRecovery ? "Récupération" : PHASE_LABEL[week.phase]}</span>
         <span className="week__km">{fmtKm(week.totalKm)} km</span>
         <span className="week__done">
-          {week.sessions.length === 0 ? "–" : `${doneCount}/${week.sessions.length}`}
+          {entries.length === 0 ? "–" : `${doneCount}/${entries.length}`}
         </span>
       </summary>
       <p className="week__focus">{week.focus}</p>
       <ul className="sessions">
-        {week.sessions.map((s) => (
-          <SessionRow key={s.id} session={s} isDone={!!done[s.id]} isToday={s.date === today} onToggle={onToggle} pace={<><PaceLine plan={plan} model={paces} session={s} /><WorkoutSteps plan={plan} model={paces} session={s} collapsed /></>} />
+        {entries.map((s) => (
+          <SessionRow
+            key={s.id}
+            session={s}
+            isDone={!!done[s.id]}
+            isToday={s.date === today}
+            onToggle={onToggle}
+            pace={
+              s.type === "strength" ? (
+                <StrengthSteps session={s} collapsed />
+              ) : (
+                <>
+                  <PaceLine plan={plan} model={paces} session={s} />
+                  <WorkoutSteps plan={plan} model={paces} session={s} collapsed />
+                </>
+              )
+            }
+          />
         ))}
       </ul>
     </details>
@@ -150,7 +169,7 @@ export function SessionRow({ session: s, isDone, isToday, onToggle, pace }: { se
         <div className="session__head">
           <span className="session__date">{day}</span>
           <span className="session__title">{s.title}</span>
-          <span className="session__km">{fmtKm(s.km)} km</span>
+          <span className="session__km">{s.type === "strength" ? `${s.strength?.minutes ?? 0} min` : `${fmtKm(s.km)} km`}</span>
         </div>
         <p className="session__details">{s.details}</p>
         {pace}

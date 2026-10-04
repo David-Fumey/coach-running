@@ -8,6 +8,8 @@ import { CheckIcon, ChevronIcon, Ring } from "./icons";
 import { currentWeekIndex } from "./PlanView";
 import { PaceLine } from "./PaceCard";
 import WorkoutSteps from "./WorkoutSteps";
+import StrengthSteps from "./StrengthSteps";
+import RestCard from "./RestCard";
 import type { PaceModel } from "../lib/paces";
 
 interface Props {
@@ -17,6 +19,7 @@ interface Props {
   onLog: (sessionId?: string) => void;
   onOpenProgram: () => void;
   onOpenProgress: () => void;
+  onToggle: (id: string) => void;
   paces: PaceModel | null;
   /** Invitation à renseigner le temps d'un test de 5 km, s'il y en a un à saisir */
   testCard?: ReactNode;
@@ -30,20 +33,23 @@ const TYPE_LABEL: Record<Session["type"], string> = {
   recovery: "Récupération",
   shakeout: "Veille de course",
   test: "Test",
+  strength: "Renforcement",
   race: "Course",
 };
 
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 /** Accueil du hub : la prochaine séance, la semaine en cours et quelques chiffres. */
-export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, paces, testCard }: Props) {
+export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, onToggle, paces, testCard }: Props) {
   const today = todayISO();
   const week = plan.weeks[currentWeekIndex(plan, today)];
   const allSessions = plan.weeks.flatMap((w) => w.sessions);
   const upcoming = allSessions.filter((s) => !done[s.id] && diffDays(today, s.date) >= 0).slice(0, 3);
   const next = upcoming[0];
   const sum = summarize(plan, activities, done, today);
-  const weekDone = week.sessions.filter((s) => done[s.id]).length;
+  const weekAll = [...week.sessions, ...(week.extras ?? [])];
+  const weekDone = weekAll.filter((s) => done[s.id]).length;
+  const todayExtra = (week.extras ?? []).find((s) => s.date === today && !done[s.id]);
   const doneCount = allSessions.filter((s) => done[s.id]).length;
   const pct = allSessions.length > 0 ? Math.round((doneCount / allSessions.length) * 100) : 0;
 
@@ -52,6 +58,23 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
       <PlanHero input={plan.input} goal={paces?.goal ?? null} />
 
       {testCard}
+
+      {todayExtra && (
+        <section className="card next next--strength" aria-labelledby="extra-title">
+          <p className="eyebrow">
+            <span id="extra-title">Aujourd'hui</span>
+          </p>
+          <h2 className="next__what">{todayExtra.title}</h2>
+          <p className="session__details">{todayExtra.details}</p>
+          <StrengthSteps session={todayExtra} />
+          <div className="actions">
+            <button type="button" className="btn btn--primary" onClick={() => onToggle(todayExtra.id)}>
+              Séance faite
+            </button>
+          </div>
+        </section>
+      )}
+      <RestCard plan={plan} today={today} />
 
       <section className={`card next${next ? ` next--${next.type}` : ""}`} aria-labelledby="next-title">
         <p className="eyebrow">
@@ -98,24 +121,24 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
         <ol className="weekdots" aria-label="Séances de la semaine">
           {DAY_LETTERS.map((letter, i) => {
             const date = addDays(week.startDate, i);
-            const s = week.sessions.find((x) => x.date === date);
+            const s = weekAll.find((x) => x.date === date);
             const state = !s ? "off" : done[s.id] ? "done" : date === today ? "today" : diffDays(today, date) < 0 ? "missed" : "todo";
             return (
               <li key={date} className={`weekdot weekdot--${state}${date === today ? " weekdot--now" : ""}`}>
                 <span className="weekdot__mark" aria-hidden="true">
-                  {state === "done" ? <CheckIcon /> : s ? fmtKm(s.km) : ""}
+                  {state === "done" ? <CheckIcon /> : s ? (s.type === "strength" ? "R" : fmtKm(s.km)) : ""}
                 </span>
                 <span className="weekdot__letter">{letter}</span>
                 <span className="sr-only">
                   {fmtDate(date, { weekday: "long" })} :{" "}
-                  {s ? `${s.title} ${fmtKm(s.km)} km${done[s.id] ? ", faite" : ""}` : "repos"}
+                  {s ? `${s.title} ${s.type === "strength" ? `${s.strength?.minutes ?? 0} min` : `${fmtKm(s.km)} km`}${done[s.id] ? ", faite" : ""}` : "repos"}
                 </span>
               </li>
             );
           })}
         </ol>
         <p className="hint">
-          {week.paused ? week.focus : `${weekDone}/${week.sessions.length} séances faites · ${fmtKm(week.totalKm)} km prévus`}
+          {week.paused ? week.focus : `${weekDone}/${weekAll.length} séances faites · ${fmtKm(week.totalKm)} km prévus`}
         </p>
         {upcoming.length > 1 && (
           <ul className="mini">

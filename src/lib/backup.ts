@@ -59,7 +59,8 @@ function validPlan(p: unknown): p is Plan {
       isNum(w.totalKm) &&
       typeof w.phase === "string" &&
       Array.isArray(w.sessions) &&
-      w.sessions.every((s) => isObj(s) && typeof s.id === "string" && isDate(s.date) && isNum(s.km) && typeof s.title === "string")
+      w.sessions.every((s) => isObj(s) && typeof s.id === "string" && isDate(s.date) && isNum(s.km) && typeof s.title === "string") &&
+      (w.extras === undefined || (Array.isArray(w.extras) && w.extras.every((s) => isObj(s) && typeof s.id === "string" && isDate(s.date) && typeof s.title === "string")))
   );
 }
 

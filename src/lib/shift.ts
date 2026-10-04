@@ -17,6 +17,13 @@ export type ShiftResult =
   | { ok: false; error: string };
 
 const sum = (sessions: Session[]) => Math.round(sessions.reduce((a, s) => a + s.km, 0) * 2) / 2;
+/** Garde seulement le renforcement déjà passé d'une semaine remplacée par une pause. */
+function withExtras(w: Week, today: string): Week {
+  const { extras, ...rest } = w;
+  const past = (extras ?? []).filter((s) => s.date < today);
+  return past.length > 0 ? { ...rest, extras: past } : rest;
+}
+
 const plannedKm = (w: Week) => w.sessions.reduce((a, s) => a + s.km, 0);
 
 /** Part de la charge à laquelle on reprend : plus la pause est longue, plus on reprend doucement. */
@@ -54,7 +61,7 @@ export function shiftPlan(plan: Plan, weeks: number, done: Record<string, boolea
   const regenerated = generatePlan({ ...plan.input, currentWeeklyKm: resumeKm, today: resumeDate });
   const untilResume = (j: number): Week =>
     j === 0
-      ? { ...first, sessions: first.sessions.filter((s) => s.date < today), isRecovery: false }
+      ? withExtras({ ...first, sessions: first.sessions.filter((s) => s.date < today), isRecovery: false }, today)
       : { index: 0, startDate: addDays(first.startDate, 7 * j), phase: first.phase, isRecovery: false, focus: "", totalKm: 0, sessions: [] };
 
   const paused: Week[] = Array.from({ length: weeks }, (_, j) => {
