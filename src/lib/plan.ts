@@ -1,5 +1,7 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
+import { qualityWorkout, tempoWorkout } from "./workouts.ts";
+
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
 export type Level = "debutant" | "intermediaire" | "avance";
 export type LongDay = "sam" | "dim";
@@ -26,6 +28,39 @@ export interface PlanInput {
   today: string;
 }
 
+/** Intensité d'un effort structuré ; les allures correspondantes viennent de paces.ts. */
+export type Intensity = "facile" | "soutenu" | "5k" | "10k" | "seuil" | "semi" | "marathon" | "course" | "coursePlus";
+
+/** Un effort : une distance ou une durée, à une intensité (en côte si `hill`). */
+export interface Seg {
+  meters?: number;
+  seconds?: number;
+  intensity: Intensity;
+  hill?: boolean;
+}
+
+export interface Rest {
+  seconds: number;
+  /** Marche plutôt que trot */
+  walk?: boolean;
+}
+
+/** `times` répétitions de l'effort, chacune suivie de la récupération (sauf la toute dernière de la séance). */
+export interface WorkSet {
+  times: number;
+  work: Seg;
+  rest?: Rest;
+}
+
+/** Déroulé d'une séance structurée, source de l'affichage pas à pas. */
+export interface Workout {
+  format: string;
+  warmKm: number;
+  coolKm: number;
+  sets: WorkSet[];
+  note?: string;
+}
+
 export interface Session {
   id: string;
   date: string;
@@ -33,6 +68,8 @@ export interface Session {
   km: number;
   title: string;
   details: string;
+  /** Absent des plans créés avant le catalogue de séances */
+  workout?: Workout;
 }
 
 export interface Week {
@@ -118,7 +155,6 @@ export function mondayOf(s: string): string {
 
 const round05 = (x: number) => Math.round(x * 2) / 2;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
-const fmtKm = (x: number) => (Number.isInteger(x) ? `${x}` : x.toFixed(1).replace(".", ","));
 
 function sessionDays(daysPerWeek: number, longDay: LongDay): number[] {
   const base: Record<number, number[]> = {
@@ -146,45 +182,7 @@ function slotTypes(daysPerWeek: number, level: Level): SessionType[] {
 }
 
 // ---------- Contenu des séances ----------
-
-function qualitySession(race: RaceKey, phase: Phase, km: number): { title: string; details: string } {
-  const work = Math.max(1, km - 3); // 2 km d'échauffement + 1 km de retour au calme
-  const warm = "2 km d'échauffement facile, puis ";
-  const cool = ", et 1 km de retour au calme.";
-  if (phase === "base") {
-    const reps = clamp(Math.round(work / 0.6), 4, 10);
-    return {
-      title: "Fartlek",
-      details: `${warm}${reps} × (1 min soutenue / 1 min 30 de trot facile)${cool} Effort 7/10 sur les phases rapides, sans chronomètre.`,
-    };
-  }
-  if (phase === "specifique" && (race === "semi" || race === "marathon")) {
-    const target = race === "semi" ? "semi-marathon" : "marathon";
-    const block = Math.max(2, Math.round(work));
-    return {
-      title: `Blocs allure ${target}`,
-      details: `${warm}${block} km à allure ${target} en 1 ou 2 blocs, récupération 2 min de trot entre les blocs${cool}`,
-    };
-  }
-  const repLen: Record<RaceKey, number> = { "5k": 0.4, "10k": 1, semi: 1, marathon: 1.6 };
-  const len = repLen[race];
-  const reps = clamp(Math.round(work / len), 3, 12);
-  const lenLabel = len < 1 ? `${len * 1000} m` : `${fmtKm(len)} km`;
-  const paceLabel =
-    phase === "specifique" ? "à allure de course ou un peu plus vite" : "à allure 10 km (effort 8/10)";
-  return {
-    title: "Fractionné",
-    details: `${warm}${reps} × ${lenLabel} ${paceLabel}, récupération en trottinant ${len < 1 ? "1 min 15" : "2 min"} entre les répétitions${cool}`,
-  };
-}
-
-function tempoSession(km: number): { title: string; details: string } {
-  const work = Math.max(2, Math.round(km - 3));
-  return {
-    title: "Tempo",
-    details: `2 km d'échauffement facile, ${work} km à allure seuil (effort 7/10, tu ne peux dire que quelques mots), 1 km de retour au calme.`,
-  };
-}
+// Les séances de qualité et de tempo viennent du catalogue (workouts.ts).
 
 function longSession(race: RaceKey, phase: Phase, km: number, recovery: boolean): { title: string; details: string } {
   const finish = Math.round(km * 0.3);
@@ -282,6 +280,9 @@ export function generatePlan(input: PlanInput): Plan {
   const slots = slotTypes(daysPerWeek, level);
   const raceDow = weekdayIndex(input.raceDate);
   const weeks: Week[] = [];
+  /** Rang des séances de qualité déjà créées, par phase, et des tempos : ils font tourner les formats. */
+  const qualityRank = new Map<Phase, number>();
+  let tempoRank = 0;
 
   for (let w = 0; w < totalWeeks; w++) {
     const weekStart = addDays(start, w * 7);
@@ -359,10 +360,11 @@ export function generatePlan(input: PlanInput): Plan {
       const easyKm = Math.max(3, (volume - fixed) / Math.max(1, easyCount));
 
       let firstEasy = true;
+      const phaseRank = qualityRank.get(phase) ?? 0;
       slots.forEach((type, i) => {
         const date = addDays(weekStart, days[i]);
         let km: number;
-        let content: { title: string; details: string };
+        let content: { title: string; details: string; workout?: Workout };
         switch (type) {
           case "long":
             km = longKm;
@@ -370,11 +372,12 @@ export function generatePlan(input: PlanInput): Plan {
             break;
           case "quality":
             km = qualityKm;
-            content = qualitySession(race, phase, round05(km));
+            content = qualityWorkout(race, phase, round05(km), phaseRank);
             break;
           case "tempo":
             km = tempoKm;
-            content = tempoSession(round05(km));
+            content = tempoWorkout(round05(km), tempoRank);
+            tempoRank++;
             break;
           case "recovery":
             km = recKm;
@@ -391,6 +394,8 @@ export function generatePlan(input: PlanInput): Plan {
         sessions.push({ id: `s-${date}`, date, type, km: round05(km), ...content });
       });
     }
+
+    if (slots.includes("quality") && !isRaceWeek) qualityRank.set(phase, (qualityRank.get(phase) ?? 0) + 1);
 
     // Les séances déjà passées (début de plan en cours de semaine) sont ignorées.
     const kept = sessions.filter((s) => diffDays(today, s.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));

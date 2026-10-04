@@ -1,6 +1,6 @@
 import { generatePlan, type Plan, type PlanInput, type Session } from "../src/lib/plan.ts";
 import { paceModel, zoneRange } from "../src/lib/paces.ts";
-import { repsFor, stepSize, workoutBlocks } from "../src/lib/steps.ts";
+import { stepSize, workoutBlocks } from "../src/lib/steps.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -20,7 +20,7 @@ for (const race of ["5k", "10k", "semi", "marathon"] as const) {
   const plan = generatePlan({ ...base, race, raceDate });
   let mismatch: unknown = null;
   let withoutStruct = 0;
-  for (const { s, w } of sessionsOf(plan)) {
+  for (const { s } of sessionsOf(plan)) {
     if (s.type !== "quality") continue;
     const blocks = workoutBlocks(plan, s, model);
     const main = blocks?.find((b) => b.id === "main");
@@ -29,9 +29,12 @@ for (const race of ["5k", "10k", "semi", "marathon"] as const) {
       withoutStruct++;
       continue;
     }
-    // Les répétitions du déroulé sont celles du texte (sauf blocs d'allure de course, sans « N × »)
+    // Les répétitions du déroulé sont celles du texte (sauf pyramides, blocs et progressives, sans « N × »)
     if (m && Number(m[1]) !== main.repeat) mismatch = { details: s.details, repeat: main.repeat };
-    if (m && repsFor(race, w.phase, s.km) !== Number(m[1])) mismatch = { details: s.details, reps: repsFor(race, w.phase, s.km) };
+    if (!s.workout) mismatch = { sansDeroule: s.title };
+    // Distance des efforts : jamais plus que la séance (marge d'un demi-kilomètre pour les arrondis)
+    const meters = (s.workout?.sets ?? []).reduce((acc, set) => acc + set.times * (set.work.meters ?? 0), 0);
+    if (meters / 1000 > s.km - 3 + 1.2 && s.workout?.warmKm) mismatch = { title: s.title, km: s.km, meters };
   }
   check(`${race} : répétitions du déroulé = texte du plan`, mismatch === null, mismatch);
   check(`${race} : chaque séance de qualité a un déroulé`, withoutStruct === 0);

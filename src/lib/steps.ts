@@ -2,8 +2,9 @@
 // TypeScript pur. Le déroulé se déduit du type de séance, de la phase de sa semaine et de ses kilomètres (les mêmes
 // règles que le texte écrit par `plan.ts`), donc il vaut aussi pour les plans déjà enregistrés.
 
-import type { Plan, RaceKey, Session, Week } from "./plan.ts";
-import { targetsFor, zoneRange, type PaceModel, type PaceRange } from "./paces.ts";
+import type { Intensity, Plan, RaceKey, Seg, Session, Workout } from "./plan.ts";
+import { intensityTarget, targetsFor, zoneRange, type PaceModel, type PaceRange } from "./paces.ts";
+import { legacyQualityWorkout, legacyTempoWorkout } from "./workouts.ts";
 
 export type StepKind = "easy" | "work" | "rest" | "stride";
 export type BlockTone = "warmup" | "main" | "cooldown" | "strides";
@@ -34,19 +35,33 @@ export interface WorkoutBlock {
 
 const RACE_LABEL: Record<RaceKey, string> = { "5k": "5 km", "10k": "10 km", semi: "semi-marathon", marathon: "marathon" };
 
-const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 const fmtKmLabel = (x: number) => (Number.isInteger(x) ? `${x}` : x.toFixed(1).replace(".", ","));
 
-/** Nombre de répétitions du fartlek, du fractionné : doit rester identique à `qualitySession` de plan.ts. */
-export function repsFor(race: RaceKey, phase: Week["phase"], km: number): number {
-  const work = Math.max(1, km - 3);
-  if (phase === "base") return clamp(Math.round(work / 0.6), 4, 10);
-  const len = repLengthKm(race);
-  return clamp(Math.round(work / len), 3, 12);
-}
+const INTENSITY_LABEL: Record<Intensity, string> = {
+  facile: "Allure facile",
+  soutenu: "Effort soutenu",
+  "5k": "Allure 5 km",
+  "10k": "Allure 10 km",
+  seuil: "Allure seuil",
+  semi: "Allure semi-marathon",
+  marathon: "Allure marathon",
+  course: "Allure de course",
+  coursePlus: "Allure de course ou plus vite",
+};
 
-export function repLengthKm(race: RaceKey): number {
-  return { "5k": 0.4, "10k": 1, semi: 1, marathon: 1.6 }[race];
+const INTENSITY_EFFORT: Partial<Record<Intensity, string>> = {
+  soutenu: "effort 7/10, sans chronomètre",
+  "5k": "effort 9/10",
+  "10k": "effort 8/10",
+  seuil: "effort 7/10, quelques mots seulement",
+};
+
+/** Déroulé enregistré avec la séance, ou celui qu'avaient les séances de qualité et de tempo avant le catalogue. */
+function workoutOf(plan: Plan, session: Session, phase: string): Workout | null {
+  if (session.workout) return session.workout;
+  if (session.type === "quality") return legacyQualityWorkout(plan.input.race, phase as Parameters<typeof legacyQualityWorkout>[1], session.km);
+  if (session.type === "tempo") return legacyTempoWorkout(session.km);
+  return null;
 }
 
 /**
@@ -69,74 +84,48 @@ export function workoutBlocks(plan: Plan, session: Session, model: PaceModel | n
     paceMode: "plafond",
     effort: "allure conversationnelle",
   });
-  const jog = (seconds: number): WorkoutStep => ({
-    kind: "rest",
-    label: "Trot facile",
-    seconds,
-    pace: model ? zoneRange(model.vdot, "recuperation") : undefined,
-    paceMode: "plafond",
-  });
-  const warm = (): WorkoutBlock => ({ id: "warmup", title: "Échauffement", tone: "warmup", repeat: 1, steps: [easy("Footing facile", 2000)] });
-  const cool = (): WorkoutBlock => ({ id: "cooldown", title: "Retour au calme", tone: "cooldown", repeat: 1, steps: [easy("Footing facile", 1000)] });
   const work = (label: string, extra: Partial<WorkoutStep>, pace?: PaceRange): WorkoutStep => ({ kind: "work", label, pace, paceMode: "fourchette", ...extra });
 
+  const structured = workoutOf(plan, session, phase);
+  if (structured) {
+    const label = (i: Intensity) => (i === "course" ? `Allure ${RACE_LABEL[race]}` : i === "coursePlus" ? `Allure ${RACE_LABEL[race]} ou plus vite` : INTENSITY_LABEL[i]);
+    const workStep = (seg: Seg): WorkoutStep => {
+      const size: Partial<WorkoutStep> = seg.meters !== undefined ? { distanceM: seg.meters } : { seconds: seg.seconds };
+      if (seg.hill) return { kind: "work", label: "Montée en côte", ...size, paceMode: "fourchette", effort: "effort 8/10, pente de 4 à 6 %" };
+      const pace = model ? intensityTarget(model, plan, session, seg.intensity) ?? undefined : undefined;
+      const effort = INTENSITY_EFFORT[seg.intensity];
+      return {
+        kind: seg.intensity === "facile" ? "easy" : "work",
+        label: label(seg.intensity),
+        ...size,
+        pace,
+        paceMode: "fourchette",
+        ...(effort ? { effort } : {}),
+      };
+    };
+    const restStep = (rest: { seconds: number; walk?: boolean }, afterHill: boolean): WorkoutStep =>
+      rest.walk
+        ? { kind: "rest", label: "Marche de récupération", seconds: rest.seconds }
+        : { kind: "rest", label: afterHill ? "Descente en trot facile" : "Trot facile", seconds: rest.seconds, pace: model ? zoneRange(model.vdot, "recuperation") : undefined, paceMode: "plafond" };
+
+    const sets = structured.sets;
+    const steps: WorkoutStep[] = [];
+    const uniform = sets.length === 1 && sets[0].times > 1;
+    for (const [si, set] of sets.entries()) {
+      for (let t = 0; t < (uniform ? 1 : set.times); t++) {
+        steps.push(workStep(set.work));
+        const last = si === sets.length - 1 && t === set.times - 1;
+        if (set.rest && (uniform || !last)) steps.push(restStep(set.rest, !!set.work.hill));
+      }
+    }
+    const blocks: WorkoutBlock[] = [];
+    if (structured.warmKm > 0) blocks.push({ id: "warmup", title: "Échauffement", tone: "warmup", repeat: 1, steps: [easy("Footing facile", structured.warmKm * 1000)] });
+    blocks.push({ id: "main", title: "Séance", tone: "main", repeat: uniform ? sets[0].times : 1, steps, ...(structured.note ? { note: structured.note } : {}) });
+    if (structured.coolKm > 0) blocks.push({ id: "cooldown", title: "Retour au calme", tone: "cooldown", repeat: 1, steps: [easy("Footing facile", structured.coolKm * 1000)] });
+    return blocks;
+  }
+
   switch (session.type) {
-    case "quality": {
-      const reps = repsFor(race, phase, session.km);
-      const total = Math.max(1, session.km - 3);
-      if (phase === "base") {
-        const pace = model ? zoneRange(model.vdot, "10k") : undefined;
-        return [
-          warm(),
-          {
-            id: "main",
-            title: "Séance",
-            tone: "main",
-            repeat: reps,
-            steps: [work("Effort soutenu", { seconds: 60, effort: "effort 7/10, sans chronomètre" }, pace), jog(90)],
-          },
-          cool(),
-        ];
-      }
-      if (phase === "specifique" && (race === "semi" || race === "marathon")) {
-        const block = Math.max(2, Math.round(total));
-        const t = targets?.targets[0];
-        const label = `Allure ${RACE_LABEL[race]}`;
-        const steps: WorkoutStep[] =
-          block >= 6
-            ? [work(label, { distanceM: Math.ceil(block / 2) * 1000 }, t), jog(120), work(label, { distanceM: Math.floor(block / 2) * 1000 }, t)]
-            : [work(label, { distanceM: block * 1000 }, t)];
-        return [warm(), { id: "main", title: "Séance", tone: "main", repeat: 1, steps, note: block >= 6 ? "Tu peux aussi enchaîner les deux blocs d'un seul tenant." : undefined }, cool()];
-      }
-      const len = repLengthKm(race);
-      const t = targets?.targets[0];
-      const label = phase === "specifique" ? "Allure de course ou plus vite" : "Allure 10 km";
-      return [
-        warm(),
-        {
-          id: "main",
-          title: "Séance",
-          tone: "main",
-          repeat: reps,
-          steps: [work(label, { distanceM: Math.round(len * 1000), effort: phase === "specifique" ? undefined : "effort 8/10" }, t), jog(len < 1 ? 75 : 120)],
-        },
-        cool(),
-      ];
-    }
-    case "tempo": {
-      const km = Math.max(2, Math.round(session.km - 3));
-      return [
-        warm(),
-        {
-          id: "main",
-          title: "Séance",
-          tone: "main",
-          repeat: 1,
-          steps: [work("Allure seuil", { distanceM: km * 1000, effort: "effort 7/10, quelques mots seulement" }, targets?.targets[0])],
-        },
-        cool(),
-      ];
-    }
     case "long": {
       if (week.isRecovery || phase !== "specifique" || !(race === "semi" || race === "marathon") || session.km < 14) {
         return [

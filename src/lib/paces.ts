@@ -6,7 +6,7 @@
 // Ce sont des repères à ajuster à l'effort ressenti, pas des prescriptions : un coureur qui ne fait que du facile verra
 // ses allures sous-estimées, un autre qui court toujours vite les verra surestimées.
 
-import type { Plan, RaceKey, Session } from "./plan.ts";
+import type { Intensity, Plan, RaceKey, Session, Workout } from "./plan.ts";
 import { diffDays } from "./plan.ts";
 import type { Activity } from "./activities.ts";
 import { RACE_KM, goalPace, vdotFromRace, type Goal } from "./goal.ts";
@@ -183,15 +183,17 @@ export interface SessionTargets {
 /** Marge autour de l'allure objectif : 1 % de part et d'autre. */
 const GOAL_MARGIN = 0.01;
 
-/**
- * Cibles d'une séance du plan, ou null quand l'effort ressenti suffit (fartlek, course sans objectif).
- * Avec un temps objectif pour cette course :
- * - les allures de course (blocs spécifiques, derniers km des sorties longues, jour J) sont celles de l'objectif ;
- * - les allures de travail (seuil, allure 10 km de la phase de construction) montent du niveau actuel vers le niveau
- *   que demande l'objectif, linéairement jusqu'à la fin de la phase de construction, sans jamais passer sous le niveau actuel ;
- * - le facile, la récupération et le facile des sorties longues restent calés sur le niveau actuel.
- */
-export function targetsFor(model: PaceModel, plan: Plan, session: Session, goal: Goal | null = model.goal): SessionTargets | null {
+interface Context {
+  week: Plan["weeks"][number];
+  race: RaceKey;
+  raceZone: ZoneId;
+  g: Goal | null;
+  target: (label: string, zone: ZoneId, fasterBy?: number, level?: number) => PaceTarget;
+  goalTarget: (label: string, fasterBy?: number) => PaceTarget;
+  weekVdot: number;
+}
+
+function contextOf(model: PaceModel, plan: Plan, session: Session, goal: Goal | null): Context | null {
   const week = plan.weeks.find((w) => w.sessions.some((s) => s.id === session.id));
   if (!week) return null;
   const race = plan.input.race;
@@ -209,6 +211,67 @@ export function targetsFor(model: PaceModel, plan: Plan, session: Session, goal:
     const p = goalPace(g!);
     return { label, slow: p * (1 + GOAL_MARGIN), fast: p * (1 - GOAL_MARGIN - fasterBy) };
   };
+  return { week, race, raceZone, g, target, goalTarget, weekVdot };
+}
+
+/** Allure cible d'une intensité de séance structurée (le travail monte vers l'objectif au fil de la construction). */
+export function intensityTarget(model: PaceModel, plan: Plan, session: Session, intensity: Intensity, goal: Goal | null = model.goal): PaceTarget | null {
+  const c = contextOf(model, plan, session, goal);
+  if (!c) return null;
+  const v = model.vdot;
+  switch (intensity) {
+    case "facile":
+      return c.target("Allure facile", "facile");
+    case "soutenu":
+      return c.target("Effort soutenu", "10k");
+    case "5k":
+      return c.target("Allure 5 km", "5k", 0, c.weekVdot);
+    case "10k":
+      return c.target("Allure 10 km", "10k", 0, c.weekVdot);
+    case "seuil":
+      return c.target("Allure seuil", "seuil", 0, c.weekVdot);
+    case "semi":
+      return c.target(ZONES.semi.label, "semi", 0, v);
+    case "marathon":
+      return c.target(ZONES.marathon.label, "marathon", 0, v);
+    case "course":
+      return c.g ? c.goalTarget("Allure objectif") : c.target(ZONES[c.raceZone].label, c.raceZone);
+    case "coursePlus":
+      return c.g ? c.goalTarget("Allure objectif ou un peu plus vite", 0.02) : c.target("Allure de course ou un peu plus vite", c.raceZone, 0.02);
+  }
+}
+
+/** Intensités chronométrées d'un déroulé, dans l'ordre : ni le facile, ni l'effort au ressenti, ni les côtes. */
+export function timedIntensities(w: Workout): Intensity[] {
+  const out: Intensity[] = [];
+  for (const set of w.sets) {
+    const { intensity, hill } = set.work;
+    if (hill || intensity === "facile" || intensity === "soutenu" || out.includes(intensity)) continue;
+    out.push(intensity);
+  }
+  return out;
+}
+
+/**
+ * Cibles d'une séance du plan, ou null quand l'effort ressenti suffit (fartlek, course sans objectif).
+ * Avec un temps objectif pour cette course :
+ * - les allures de course (blocs spécifiques, derniers km des sorties longues, jour J) sont celles de l'objectif ;
+ * - les allures de travail (seuil, allure 10 km de la phase de construction) montent du niveau actuel vers le niveau
+ *   que demande l'objectif, linéairement jusqu'à la fin de la phase de construction, sans jamais passer sous le niveau actuel ;
+ * - le facile, la récupération et le facile des sorties longues restent calés sur le niveau actuel.
+ */
+export function targetsFor(model: PaceModel, plan: Plan, session: Session, goal: Goal | null = model.goal): SessionTargets | null {
+  const c = contextOf(model, plan, session, goal);
+  if (!c) return null;
+  const { week, race, raceZone, g, target, goalTarget, weekVdot } = c;
+
+  // Séance de qualité du catalogue : les allures viennent de son déroulé (rien si tout se fait au ressenti).
+  if (session.type === "quality" && session.workout) {
+    const list = timedIntensities(session.workout)
+      .map((i) => intensityTarget(model, plan, session, i, goal))
+      .filter((t): t is PaceTarget => t !== null);
+    return list.length > 0 ? { targets: list, comparable: false } : null;
+  }
 
   switch (session.type) {
     case "easy":
