@@ -1,4 +1,6 @@
 import { useState } from "react";
+import Figure from "./Figure";
+import { POSES } from "../lib/poses";
 import { GUIDE, ZONE_LABEL, doseLabel, drillsOf, stretchRoutine, warmupRoutine, type Drill, type DrillKind } from "../lib/drills";
 
 /** Onglet « Exercices » : échauffement avant la séance, étirements après. Chaque exercice est une carte dépliable. */
@@ -104,6 +106,14 @@ function DrillCard({ drill: d, open, onToggle }: { drill: Drill; open: boolean; 
         </span>
       </summary>
       <div className="topic__body">
+        <div className={`drills__frames${(POSES[d.id] ?? []).length === 1 ? " drills__frames--one" : ""}`}>
+          {(POSES[d.id] ?? []).map((f) => (
+            <figure key={f.label} className="drills__frame">
+              <Figure pose={f.pose} />
+              <figcaption>{f.label}</figcaption>
+            </figure>
+          ))}
+        </div>
         <p>
           <strong>Travaille :</strong> {d.target}.
         </p>

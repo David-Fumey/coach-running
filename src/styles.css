@@ -3767,3 +3767,73 @@ body {
 .topic--zone-corps {
   --c: var(--accent);
 }
+
+.drills__frames {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.drills__frames--one {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 20rem;
+}
+
+.drills__frame {
+  margin: 0;
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+}
+
+.drills__frame figcaption {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.fig {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.fig__floor {
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+}
+
+.fig__wall {
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.fig__box {
+  fill: var(--line);
+  stroke: var(--line-strong);
+}
+
+.fig__seg {
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.fig__seg--body {
+  stroke: var(--ink);
+}
+
+.fig__seg--near {
+  stroke: var(--c, var(--accent));
+}
+
+.fig__seg--far {
+  stroke: var(--muted);
+  opacity: 0.6;
+}
+
+.fig__head {
+  fill: var(--ink);
+}
