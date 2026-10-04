@@ -65,3 +65,8 @@ npm run test:drills      # vérifie les exercices d'échauffement et d'étiremen
 ## Journal des sessions
 
 Chaque session de travail avec Claude est résumée dans `docs/sessions/AAAA-MM-JJ-titre.md` : décisions prises, ce qui a été fait, ce qui reste. Lire la plus récente avant de reprendre le travail ; `docs/sessions/2026-10-04-bilan.md` fait la synthèse de la journée du 4 octobre et liste ce qui reste.
+
+## Publication
+
+- Le serveur de développement a un port fixe (5173, `strictPort`) : le `localStorage` est lié à l'adresse, un autre port ferait repartir l'application de zéro.
+- `.github/workflows/deploy.yml` publie `dist/` sur GitHub Pages à chaque poussée sur `main` (réglage unique : Settings → Pages → Source : GitHub Actions). Adresse : `https://david-fumey.github.io/coach-running/`. Pour Strava, le « domaine de rappel d'autorisation » est `david-fumey.github.io`. Les données restent dans le navigateur de chacun ; changer d'appareil demande une sauvegarde JSON, et la connexion Strava se ressaisit.
