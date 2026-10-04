@@ -13,6 +13,9 @@ import {
   nutritionOf,
   suggestCriteria,
   suitsDiet,
+  addToShopping,
+  removeFromShopping,
+  shoppingLines,
   knownFavorites,
   toggleFavorite,
   type Criteria,
@@ -181,6 +184,41 @@ check("favorites : la liste d'origine n'est pas modifiée", (() => {
 check("favorites : identifiants inconnus et doublons écartés", (() => {
   const k = knownFavorites([RECIPES[0].id, "inconnue", RECIPES[0].id, RECIPES[2].id]);
   return k.length === 2 && k[0] === RECIPES[0].id && k[1] === RECIPES[2].id;
+})());
+
+// ---------- Liste de courses ----------
+
+check("courses : une recette ajoutée donne ses ingrédients", (() => {
+  const r = RECIPES[0];
+  const lines = shoppingLines(addToShopping([], r.id, 1));
+  return lines.length === new Set(r.ingredients.map((i) => i.food)).size && lines.every((l) => l.from.includes(r.name));
+})());
+check("courses : les portions multiplient les quantités", (() => {
+  const r = RECIPES[0];
+  const one = shoppingLines(addToShopping([], r.id, 1));
+  const three = shoppingLines(addToShopping([], r.id, 3));
+  return one.every((l, i) => Math.abs(three[i].grams - 3 * l.grams) < 1e-9);
+})());
+check("courses : la même recette cumule ses portions", (() => {
+  const l = addToShopping(addToShopping([], RECIPES[0].id, 1.5), RECIPES[0].id, 2);
+  return l.length === 1 && l[0].portions === 3.5;
+})());
+check("courses : un aliment commun est additionné", (() => {
+  const shared = RECIPES.flatMap((a) => RECIPES.filter((b) => b.id > a.id).map((b) => [a, b] as const)).find(([a, b]) => a.ingredients.some((i) => b.ingredients.some((j) => j.food === i.food)))!;
+  const food = shared[0].ingredients.find((i) => shared[1].ingredients.some((j) => j.food === i.food))!.food;
+  const lines = shoppingLines(addToShopping(addToShopping([], shared[0].id, 1), shared[1].id, 1));
+  const line = lines.find((l) => l.food === food)!;
+  const expected = shared[0].ingredients.filter((i) => i.food === food).reduce((a, i) => a + i.grams, 0) + shared[1].ingredients.filter((i) => i.food === food).reduce((a, i) => a + i.grams, 0);
+  return line.from.length === 2 && Math.abs(line.grams - expected) < 1e-9 && lines.filter((l) => l.food === food).length === 1;
+})());
+check("courses : retrait d'une recette et recette inconnue", (() => {
+  const l = addToShopping(addToShopping([], RECIPES[0].id, 1), RECIPES[1].id, 1);
+  const rest = removeFromShopping(l, RECIPES[0].id);
+  return rest.length === 1 && rest[0].recipe === RECIPES[1].id && shoppingLines([{ recipe: "inconnue", portions: 2 }]).length === 0;
+})());
+check("courses : lignes triées et libellés non vides", (() => {
+  const lines = shoppingLines(RECIPES.reduce((acc, r) => addToShopping(acc, r.id, 1), [] as ReturnType<typeof addToShopping>));
+  return lines.every((l, i) => l.amount.length > 0 && (i === 0 || lines[i - 1].name.localeCompare(l.name, "fr") <= 0));
 })());
 
 process.exit(failures ? 1 : 0);

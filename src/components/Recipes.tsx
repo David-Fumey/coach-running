@@ -10,6 +10,7 @@ import {
   describeSuggestion,
   dietsOf,
   filterRecipes,
+  addToShopping,
   ingredientLines,
   knownFavorites,
   nutritionOf,
@@ -20,7 +21,8 @@ import {
   type MomentFilter,
   type Recipe,
 } from "../lib/recipes";
-import { todayISO } from "../storage";
+import { todayISO, useStoredState } from "../storage";
+import ShoppingList, { type ShoppingState } from "./ShoppingList";
 
 interface Props {
   plan: Plan;
@@ -53,6 +55,8 @@ export default function Recipes({ plan, done, activities, profile, onAddFood, fa
   const suggestion = suggestCriteria(ctx.kind, ctx.eve);
   const favs = knownFavorites(favorites);
   const [onlyFavs, setOnlyFavs] = useState(false);
+  // Liste de courses : provisoire, gardée sur l'appareil mais hors sauvegarde
+  const [shopping, setShopping] = useStoredState<ShoppingState>("foulee.shopping.v1", { items: [], checked: [] });
   const matching = filterRecipes(criteria);
   const results = onlyFavs ? matching.filter((r) => favs.includes(r.id)) : matching;
   const target = profile ? dayTarget(plan, profile, activities, done, today, today) : null;
@@ -126,6 +130,8 @@ export default function Recipes({ plan, done, activities, profile, onAddFood, fa
         </div>
       </details>
 
+      <ShoppingList state={shopping} onChange={setShopping} />
+
       <div className="recipes__bar">
         <p className="recipes__count" role="status">
           {results.length === 0 ? "Aucune recette" : results.length === 1 ? "1 recette" : `${results.length} recettes`}
@@ -158,6 +164,7 @@ export default function Recipes({ plan, done, activities, profile, onAddFood, fa
               onToggle={(o) => setOpenId((cur) => (o ? r.id : cur === r.id ? null : cur))}
               onAddFood={onAddFood}
               favorite={favs.includes(r.id)}
+              onAddShopping={(portions) => setShopping((s) => ({ ...s, items: addToShopping(s.items, r.id, portions) }))}
               onToggleFavorite={() => onToggleFavorite(r.id)}
               today={today}
             />
@@ -212,6 +219,7 @@ function RecipeCard({
   onAddFood,
   favorite,
   onToggleFavorite,
+  onAddShopping,
   today,
 }: {
   recipe: Recipe;
@@ -222,10 +230,12 @@ function RecipeCard({
   onAddFood: (f: Omit<Food, "id">) => void;
   favorite: boolean;
   onToggleFavorite: () => void;
+  onAddShopping: (portions: number) => void;
   today: string;
 }) {
   const [portions, setPortions] = useState(1);
   const [added, setAdded] = useState(false);
+  const [listed, setListed] = useState(false);
   const n = nutritionOf(recipe, portions);
   const diets = dietsOf(recipe);
   const portionLabel = portions === 1 ? "1 portion" : `${fmt(portions)} portions`;
@@ -347,7 +357,15 @@ function RecipeCard({
           <button type="button" className="btn" aria-pressed={favorite} onClick={onToggleFavorite}>
             {favorite ? "★ Retirer des favorites" : "☆ Ajouter aux favorites"}
           </button>
+          <button type="button" className="btn" onClick={() => { onAddShopping(portions); setListed(true); }}>
+            Ajouter à la liste de courses
+          </button>
         </div>
+        {listed && (
+          <p className="notice" role="status">
+            Ajouté à la liste de courses : {portionLabel}. Elle s'affiche en haut de l'écran Recettes.
+          </p>
+        )}
         {added && (
           <p className="notice" role="status">
             Ajouté : {recipe.name}, {n.kcal} kcal. Retrouve-le dans « Suivi du jour ».

@@ -781,3 +781,51 @@ export function knownFavorites(favorites: string[], recipes: Recipe[] = RECIPES)
   const known = new Set(recipes.map((r) => r.id));
   return [...new Set(favorites)].filter((id) => known.has(id));
 }
+
+// ---------- Liste de courses ----------
+
+/** Une recette de la liste de courses, avec le nombre de portions voulu. */
+export interface ShoppingEntry {
+  recipe: string;
+  portions: number;
+}
+
+export const MAX_SHOPPING_PORTIONS = 40;
+
+/** Ajoute des portions d'une recette (cumulées si elle y est déjà). */
+export function addToShopping(list: ShoppingEntry[], recipe: string, portions: number): ShoppingEntry[] {
+  const found = list.find((e) => e.recipe === recipe);
+  if (!found) return [...list, { recipe, portions }];
+  return list.map((e) => (e.recipe === recipe ? { ...e, portions: Math.min(MAX_SHOPPING_PORTIONS, e.portions + portions) } : e));
+}
+
+export function removeFromShopping(list: ShoppingEntry[], recipe: string): ShoppingEntry[] {
+  return list.filter((e) => e.recipe !== recipe);
+}
+
+export interface ShoppingLine {
+  food: FoodId;
+  name: string;
+  grams: number;
+  amount: string;
+  /** Recettes qui utilisent cet aliment */
+  from: string[];
+}
+
+/** Ingrédients de toutes les recettes de la liste, regroupés par aliment, par ordre alphabétique. */
+export function shoppingLines(list: ShoppingEntry[], recipes: Recipe[] = RECIPES): ShoppingLine[] {
+  const byFood = new Map<FoodId, { grams: number; from: string[] }>();
+  for (const e of list) {
+    const r = recipes.find((x) => x.id === e.recipe);
+    if (!r) continue;
+    for (const { food: id, grams } of r.ingredients) {
+      const cur = byFood.get(id) ?? { grams: 0, from: [] };
+      cur.grams += grams * e.portions;
+      if (!cur.from.includes(r.name)) cur.from.push(r.name);
+      byFood.set(id, cur);
+    }
+  }
+  return [...byFood.entries()]
+    .map(([id, v]) => ({ food: id, name: food(id).name, grams: v.grams, amount: formatAmount(id, v.grams), from: v.from }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
