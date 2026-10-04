@@ -7,6 +7,7 @@ import { CheckIcon } from "./icons";
 import PaceCard, { PaceLine } from "./PaceCard";
 import GoalCard from "./GoalCard";
 import WorkoutSteps from "./WorkoutSteps";
+import { upgradableCount } from "../lib/workouts";
 import ShiftCard from "./ShiftCard";
 import type { Goal } from "../lib/goal";
 import type { PaceModel } from "../lib/paces";
@@ -26,6 +27,8 @@ interface Props {
   canUndoShift: boolean;
   onShift: (weeks: number) => void;
   onUndoShift: () => void;
+  /** Passe les séances de qualité et de tempo à venir au catalogue de séances */
+  onUpgrade: () => void;
 }
 
 /** Index de la semaine en cours (ou la plus proche si le plan n'a pas commencé ou est terminé). */
@@ -37,8 +40,9 @@ export function currentWeekIndex(plan: Plan, today: string) {
 }
 
 /** Onglet « Programme » : le plan complet, semaine par semaine. */
-export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal, canUndoShift, onShift, onUndoShift }: Props) {
+export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal, canUndoShift, onShift, onUndoShift, onUpgrade }: Props) {
   const today = todayISO();
+  const upgradable = upgradableCount(plan, done, today);
   const currentIndex = currentWeekIndex(plan, today);
 
   return (
@@ -49,6 +53,20 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
             <li key={w}>{w}</li>
           ))}
         </ul>
+      )}
+
+      {upgradable > 0 && (
+        <section className="card upgrade-card" aria-labelledby="upgrade-title">
+          <h2 id="upgrade-title" className="card__title">Nouvelles séances disponibles</h2>
+          <p className="hint">
+            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sortie progressive, avec l'allure de chaque portion. Les dates, les kilomètres et les séances déjà faites ne changent pas.
+          </p>
+          <div className="actions">
+            <button type="button" className="btn btn--primary" onClick={onUpgrade}>
+              Mettre à jour mes séances à venir
+            </button>
+          </div>
+        </section>
       )}
 
       <VolumeChart weeks={plan.weeks} currentIndex={currentIndex} doneIds={done} />

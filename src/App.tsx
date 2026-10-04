@@ -3,6 +3,7 @@ import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
 import { canUndoShift, shiftPlan } from "./lib/shift";
+import { upgradePlan } from "./lib/workouts";
 import { DEFAULT_WEIGHT_KG, calibration, postRunLoss, type Water, type Weighing } from "./lib/hydration";
 import LossBanner from "./components/LossBanner";
 import type { View as NutritionView } from "./components/Nutrition";
@@ -119,6 +120,11 @@ export default function App() {
     setPlanBeforeShift(plan);
     setPlan(r.plan);
     return null;
+  }
+
+  function upgradeSessions() {
+    if (!plan) return;
+    setPlan(upgradePlan(plan, done, todayISO()));
   }
 
   function undoShift() {
@@ -293,6 +299,7 @@ export default function App() {
             canUndoShift={canUndoShift(planBeforeShift, plan, done, activities)}
             onShift={shiftProgram}
             onUndoShift={undoShift}
+            onUpgrade={upgradeSessions}
           />
         )}
         {tab === "activites" && (
