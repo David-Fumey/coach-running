@@ -13,9 +13,11 @@ Distance, durée, fréquence cardiaque moyenne et maximale, dénivelé positif, 
 - Pour les autres, `loadDetail` (src/useStrava.ts) lit le détail à la demande : une seule requête à l'ouverture, avec renouvellement du jeton si besoin. Le résultat est gardé, donc jamais relu.
 - Écran : bouton « Voir le détail » sur chaque sortie ; grille de chiffres, puis barres « temps par kilomètre » (le kilomètre le plus rapide en accent). Une sortie saisie à la main n'a que son résumé, et le dit.
 - La sauvegarde conserve et valide le détail (`validDetail`).
+- Courbes dans le temps (`Series`) : allure, fréquence cardiaque et altitude, lues dans les flux Strava (`/activities/{id}/streams`, une requête de plus, une seule fois par sortie) et ramenées à 100 points (moyenne par tronçon de temps) pour garder le stockage léger. 0 signifie « inconnu » (arrêt, pas de capteur). Un 404 ou une sortie sans flux est marquée « lue ». Un quota ou une coupure ne marque rien : la lecture sera retentée à la prochaine ouverture.
+- Affichage : l'allure (la plus rapide en haut) sur un fond d'altitude, puis la fréquence cardiaque, avec un lissage léger à l'affichage (le GPS rend l'allure en dents de scie). L'échelle ignore les 5 % de valeurs extrêmes.
 
 ## Tests
-`check-strava.ts` : lecture du détail (valeurs invalides écartées, dénivelé négatif conservé, cadence doublée), client réseau (404 marqué lu), application sans écrasement, aller-retour et refus d'une sauvegarde invalide.
+`check-strava.ts` : courbes (échantillonnage, arrêts, capteur absent, longueurs alignées, client, sauvegarde) et lecture du détail (valeurs invalides écartées, dénivelé négatif conservé, cadence doublée), client réseau (404 marqué lu), application sans écrasement, aller-retour et refus d'une sauvegarde invalide.
 
 ## Réparation d'un test existant
 `check-workouts.ts` ne se chargeait plus depuis le garde-fou de charge (variable `pyr` déclarée deux fois), donc sa fin n'avait pas tourné. Une fois chargé, trois vérifications étaient à corriger, sans toucher au moteur :
@@ -24,5 +26,4 @@ Distance, durée, fréquence cardiaque moyenne et maximale, dénivelé positif, 
 - deux scénarios cherchaient une semaine « fractionné + tempo » que la rotation ne produit plus : ils construisent maintenant leur cas explicitement.
 
 ## Ce qui reste
-- Le tracé de la fréquence cardiaque et de l'allure dans le temps (flux Strava) demanderait une requête de plus par sortie : à voir si le besoin se confirme.
 - Les kilomètres partiels de fin de sortie s'affichent avec leur distance (par exemple « 0,52 km »).

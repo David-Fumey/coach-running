@@ -13,7 +13,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 5. Écran Progrès filtrable : programme actuel ou total, graphiques par semaine, mois ou année (v0.7, fait), avec records personnels (v0.8, fait).
 6. Allures cibles par séance, déduites de la moyenne des sorties enregistrées (v0.9, fait), avec temps objectif de course (v0.10, fait), et décalage du programme avec pause (v0.11, fait), et onglet Hydratation (v0.12, fait).
 7. Déroulé pas à pas des séances, avec l'allure de chaque portion (v0.13, fait), et catalogue de séances de qualité variées : côtes, pyramides, intervalles au seuil, sortie progressive (v0.14, fait), puis sorties longues variées : progressive, alternance, blocs au seuil (v0.15, fait), puis niveaux : course/marche pour les débutants, deux séances de travail pour les avancés sur 4 jours (v0.16, fait), et test de 5 km qui recale les allures (v0.17, fait), puis renforcement les jours sans course et conseils de repos (v0.18, fait), puis deuxième séance de qualité pour les avancés (v0.19, fait), test de 30 minutes en phase spécifique et garde-fou de charge hebdomadaire (v0.20, fait).
-8. Détail d'une sortie importée : temps par kilomètre, cadence, calories, lus dans Strava et affichés au clic (v0.21, fait).
+8. Détail d'une sortie importée : temps par kilomètre, cadence, calories, et courbes d'allure et de fréquence cardiaque, lus dans Strava et affichés au clic (v0.21, fait).
 
 ## Stack
 
