@@ -355,7 +355,7 @@ export function upgradableCount(plan: Plan, done: Record<string, boolean>, today
 export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: string): Plan {
   const rank = new Map<Phase, number>();
   const longRank = new Map<Phase, number>();
-  let tempoRank = 0;
+  let secondRank = 0;
   const level = plan.input.level;
   const runWalk = needsRunWalk(plan.input);
   const trainingWeeks = trainingWeeksOf(plan);
@@ -371,8 +371,13 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
         ? w.sessions.find((s) => s.type === "quality" && s.date >= today && !done[s.id])
         : undefined;
     if (testTarget) tested.add(w.phase);
+    // Séances de qualité de la semaine : la première est la principale, sauf si la semaine a un test (elle est alors
+    // remplacée) ; les suivantes sont les deuxièmes séances de qualité d'un avancé.
+    const quals = w.sessions.filter((s) => s.type === "quality");
+    const hasTest = !!testTarget || w.sessions.some((s) => s.type === "test");
+    const mainQuality = hasTest ? undefined : quals[0];
     const phaseRank = rank.get(w.phase) ?? 0;
-    if (w.sessions.some((s) => s.type === "quality") && !testTarget) rank.set(w.phase, phaseRank + 1);
+    if (mainQuality) rank.set(w.phase, phaseRank + 1);
     const longN = longRank.get(w.phase) ?? 0;
     if (!w.isRecovery && w.sessions.some((s) => s.type === "long")) longRank.set(w.phase, longN + 1);
     const sessions = w.sessions.map((s) => {
@@ -381,14 +386,21 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
         return { ...s, type: "test" as const, km: TEST_SESSION_KM, title: t.title, details: t.details, workout: t.workout };
       }
       let built: Built | null = null;
+      const second = s.type === "tempo" || (s.type === "quality" && s !== mainQuality);
+      const n = secondRank;
+      if (second && !(level === "avance" && w.isRecovery)) secondRank++;
+      const open = s.date >= today && !done[s.id];
+      // Plan d'avancé enregistré avant la deuxième séance de qualité : un tempo sur deux devient une séance de qualité.
+      if (s.type === "tempo" && level === "avance" && !w.isRecovery && n % 2 === 1 && open) {
+        const q = qualityWorkout(plan.input.race, w.phase, s.km, phaseRank + 1, level);
+        return { ...s, type: "quality" as const, title: q.title, details: q.details, workout: q.workout };
+      }
       if (!upgradable(s, done, today, walking)) {
-        if (s.type === "tempo") tempoRank++;
-      } else if (s.type === "quality") built = walking ? fartlekWalk(s.km) : qualityWorkout(plan.input.race, w.phase, s.km, phaseRank, level);
+        // rien à changer
+      } else if (s.type === "quality") built = walking ? fartlekWalk(s.km) : qualityWorkout(plan.input.race, w.phase, s.km, s === mainQuality ? phaseRank : phaseRank + 1, level);
       else if (s.type === "long") built = walking ? runWalkWorkout(s.km, stage + 1, true) : longWorkout(plan.input.race, w.phase, s.km, w.isRecovery, longN, level);
-      else if (s.type === "tempo") {
-        built = tempoWorkout(s.km, tempoRank, level);
-        tempoRank++;
-      } else built = runWalkWorkout(s.km, stage, false);
+      else if (s.type === "tempo") built = tempoWorkout(s.km, level === "avance" ? Math.floor(n / 2) : n, level);
+      else built = runWalkWorkout(s.km, stage, false);
       return built ? { ...s, title: built.title, details: built.details, workout: built.workout } : s;
     });
     // Renforcement et mobilité les jours sans course, pour les semaines qui n'en ont pas encore.

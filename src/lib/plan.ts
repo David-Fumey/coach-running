@@ -301,7 +301,8 @@ export function generatePlan(input: PlanInput): Plan {
   /** Rang des séances de qualité déjà créées, par phase, et des tempos : ils font tourner les formats. */
   const qualityRank = new Map<Phase, number>();
   const longRank = new Map<Phase, number>();
-  let tempoRank = 0;
+  /** Rang des séances du deuxième créneau de travail (tempo, ou deuxième séance de qualité d'un avancé). */
+  let secondRank = 0;
   // Débutant qui court peu : les premières semaines alternent course et marche, de plus en plus de course.
   const runWalk = needsRunWalk(input);
   const walkWeeks = runWalkWeeks(trainingWeeks);
@@ -396,6 +397,7 @@ export function generatePlan(input: PlanInput): Plan {
         const date = addDays(weekStart, days[i]);
         let km: number;
         let isTest = false;
+        let isSecondQuality = false;
         let content: { title: string; details: string; workout?: Workout };
         switch (type) {
           case "long":
@@ -412,8 +414,13 @@ export function generatePlan(input: PlanInput): Plan {
             break;
           case "tempo":
             km = tempoKm;
-            content = tempoWorkout(round05(km), tempoRank, level);
-            tempoRank++;
+            // Un avancé alterne, sur ce créneau, tempo ou intervalles au seuil et une deuxième séance de qualité.
+            if (level === "avance" && !isRecovery && secondRank % 2 === 1) {
+              content = qualityWorkout(race, phase, round05(km), phaseRank + 1, level);
+              isSecondQuality = true;
+            } else content = tempoWorkout(round05(km), level === "avance" ? Math.floor(secondRank / 2) : secondRank, level);
+            // La semaine de récupération d'un avancé ne fait pas avancer l'alternance.
+            if (!(level === "avance" && isRecovery)) secondRank++;
             break;
           case "recovery":
             km = recKm;
@@ -429,7 +436,7 @@ export function generatePlan(input: PlanInput): Plan {
             content = walking ? runWalkWorkout(round05(km), stage, false) : easySession(firstEasy && level !== "debutant" && phase !== "base");
             firstEasy = false;
         }
-        sessions.push({ id: `s-${date}`, date, type: isTest ? "test" : type, km: round05(km), ...content });
+        sessions.push({ id: `s-${date}`, date, type: isTest ? "test" : isSecondQuality ? "quality" : type, km: round05(km), ...content });
       });
     }
 

@@ -152,6 +152,34 @@ for (const { s } of all(walkPlanOld)) if (s.type !== "test") delete s.workout;
 check("ancien plan de débutant : la mise à jour donne le plan neuf", isDeepStrictEqual(upgradePlan(walkPlanOld, {}, "2026-10-05"), beginner));
 check("ancien plan de débutant : les footings de course/marche sont à mettre à jour", upgradableCount(walkPlanOld, {}, "2026-10-05") > upgradableCount(beginner, {}, "2026-10-05") && upgradableCount(beginner, {}, "2026-10-05") === 0);
 
+// ---------- Deuxième séance de qualité des avancés ----------
+const second = (p: Plan) =>
+  p.weeks
+    .filter((w) => w.phase !== "course")
+    .map((w) => ({ w, s: w.sessions.filter((x) => x.type === "tempo" || (x.type === "quality" && x.date > w.sessions.find((y) => y.type === "quality" || y.type === "test")!.date)) }))
+    .filter(({ s }) => s.length > 0);
+for (const days of [4, 5, 6] as const) {
+  const adv = generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: days, currentWeeklyKm: 40 }));
+  const slots = second(adv).filter(({ w }) => !w.isRecovery).map(({ s }) => s[0].type);
+  check(`avancé sur ${days} jours : le deuxième créneau alterne tempo et séance de qualité`, slots.length >= 10 && slots.every((t, i) => t === (i % 2 === 0 ? "tempo" : "quality")), slots);
+  const clash = adv.weeks.filter((w) => w.sessions.filter((x) => x.type === "quality").length === 2 && w.sessions.filter((x) => x.type === "quality")[0].workout!.format === w.sessions.filter((x) => x.type === "quality")[1].workout!.format);
+  check(`avancé sur ${days} jours : les deux séances de qualité d'une semaine sont de formats différents`, clash.length === 0, clash.map((w) => w.index));
+  check(`avancé sur ${days} jours : pas de deuxième séance de qualité en semaine de récupération`, adv.weeks.filter((w) => w.isRecovery).every((w) => w.sessions.filter((x) => x.type === "quality").length <= 1));
+  check(`avancé sur ${days} jours : chaque séance de qualité a son déroulé et ses allures`, adv.weeks.flatMap((w) => w.sessions).filter((x) => x.type === "quality" || x.type === "tempo").every((x) => workoutBlocks(adv, x, model) !== null && x.workout !== undefined));
+}
+const mid5 = generatePlan(input("10k", "2027-02-14", { level: "intermediaire", daysPerWeek: 5, currentWeeklyKm: 40 }));
+check("intermédiaire : le deuxième créneau reste un tempo", mid5.weeks.flatMap((w) => w.sessions).filter((x) => x.type === "quality").length === mid5.weeks.filter((w) => w.sessions.some((x) => x.type === "quality")).length && second(mid5).every(({ s }) => s[0].type === "tempo"));
+const adv5 = generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: 5, currentWeeklyKm: 40 }));
+const oldAdv: Plan = JSON.parse(JSON.stringify(adv5));
+for (const { s, w } of all(oldAdv)) {
+  if (s.type === "test") continue;
+  delete s.workout;
+  const firstQ = w.sessions.find((x) => x.type === "quality" || x.type === "test");
+  if (s.type === "quality" && s !== firstQ) Object.assign(s, { type: "tempo", title: "Tempo", details: "ancien" });
+}
+check("ancien plan d'avancé (tempo seulement) : la mise à jour crée les deuxièmes séances de qualité", isDeepStrictEqual(upgradePlan(oldAdv, {}, "2026-10-05"), adv5));
+check("ancien plan d'avancé : la mise à jour est comptée, puis plus rien", upgradableCount(oldAdv, {}, "2026-10-05") > 0 && upgradableCount(upgradePlan(oldAdv, {}, "2026-10-05"), {}, "2026-10-05") === 0);
+
 // ---------- Mise à jour d'un plan enregistré ----------
 const oldMarathon: Plan = JSON.parse(JSON.stringify(marathon));
 for (const { s } of all(oldMarathon)) if (s.type !== "test") delete s.workout;
