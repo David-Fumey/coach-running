@@ -30,3 +30,10 @@ L'interface paraissait trop épaisse, « pâteuse » et grosse. L'utilisateur vo
 
 - Le CSS comporte des tailles écrites en dur dans les sections plus anciennes (Nutrition, Conseils, Recettes) : à repasser si l'une d'elles paraît encore lourde.
 - Les nuances de couleur sont des jetons en tête de feuille (`--c-green`, `--tab-home`) : faciles à ajuster.
+
+## Complément : Nutrition, Conseils, Recettes
+
+- Liserés de 5 px ramenés à 3 px (fiches d'apport, phase, suggestion, recette, bandeau de perte d'eau, barre des jours).
+- Titres et chiffres réduits : titre des fiches, jour du journal, relevés, temps objectif, quantité d'eau et perte de sueur.
+- Pastilles et jours sélectionnés en bleu au lieu de noir.
+- Limite : l'écran « Suivi » n'est visible qu'avec un profil nutrition, que l'utilisateur n'a pas encore saisi ; il n'a pas pu être contrôlé à l'écran (ses titres et chiffres sont réduits comme les autres).
