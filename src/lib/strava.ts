@@ -290,9 +290,10 @@ export const RECENT_TEMP_COUNT = 8;
  */
 export function detailTargets(activities: Activity[], perDistance = EFFORT_CANDIDATES_PER_DISTANCE, max = EFFORT_BATCH): Activity[] {
   const recent = activities
-    .filter((a) => stravaNumericId(a) !== null && a.temp === undefined)
+    .filter((a) => stravaNumericId(a) !== null)
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
-    .slice(0, RECENT_TEMP_COUNT);
+    .slice(0, RECENT_TEMP_COUNT)
+    .filter((a) => a.temp === undefined);
   const out = new Map<string, Activity>();
   for (const a of recent) out.set(a.id, a);
   for (const a of effortCandidates(activities, perDistance, Infinity)) out.set(a.id, a);
