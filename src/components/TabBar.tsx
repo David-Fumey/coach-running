@@ -15,6 +15,10 @@ export const TABS: { id: Tab; label: string; title: string; icon: ReactNode }[] 
 export default function TabBar({ tab, onChange }: { tab: Tab | null; onChange: (t: Tab) => void }) {
   return (
     <nav className="tabbar" aria-label="Navigation principale">
+      <span className="tabbar__brand" aria-hidden="true">
+        <img src="./icon.svg" alt="" width="28" height="28" />
+        Runner
+      </span>
       {TABS.map((t) => (
         <button
           key={t.id}
