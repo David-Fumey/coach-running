@@ -54,6 +54,8 @@ export default function App() {
   const [lossSeen, setLossSeen] = useStoredState<string[]>("foulee.lossseen.v1", []);
   /** Volet de Nutrition à ouvrir (depuis le rappel d'hydratation) */
   const [nutritionStart, setNutritionStart] = useState<NutritionView | undefined>();
+  /** Jour à afficher dans le suivi de nutrition (depuis une activité) */
+  const [nutritionDate, setNutritionDate] = useState<string | undefined>();
   // Allure moyenne d'entraînement saisie à la main ; null = calculée sur les sorties enregistrées.
   const [paceRef, setPaceRef] = useStoredState<number | null>("foulee.pace.v1", null);
   // Temps objectif de course. Il appartient à une course : s'il ne correspond pas à celle du plan, il est ignoré.
@@ -194,6 +196,7 @@ export default function App() {
 
   function goTo(next: Tab) {
     setNutritionStart(undefined);
+    setNutritionDate(undefined);
     setShowProfile(false);
     setPresetSession(undefined);
     setTab(next);
@@ -202,6 +205,15 @@ export default function App() {
 
   function dismissLoss(id: string) {
     setLossSeen((prev) => [...prev.filter((x) => x !== id), id].slice(-50));
+  }
+
+  /** Ouvre le suivi de nutrition sur le jour d'une activité. */
+  function openNutritionFor(date: string) {
+    setNutritionStart("jour");
+    setNutritionDate(date);
+    setShowProfile(false);
+    setTab("nutrition");
+    window.scrollTo({ top: 0 });
   }
 
   function openHydration(id: string) {
@@ -356,6 +368,7 @@ export default function App() {
             onDelete={deleteActivity}
             strava={strava}
             onOpenProfile={openProfile}
+            onOpenNutrition={openNutritionFor}
             paces={paces}
           />
         )}
@@ -381,6 +394,7 @@ export default function App() {
             favorites={favorites}
             onToggleFavorite={(id) => setFavorites((prev) => toggleFavorite(prev, id))}
             startView={nutritionStart}
+            startDate={nutritionDate}
           />
         )}
       </main>

@@ -88,6 +88,9 @@ function eveCarbs(race: RaceKey): number {
   return race === "marathon" ? 10 : race === "semi" ? 9 : 8;
 }
 
+/** Distance à partir de laquelle une sortie libre est traitée comme une sortie longue. */
+export const LONG_FREE_RUN_KM = 15;
+
 export function kindOf(type: Session["type"] | undefined, km: number): DayKind {
   switch (type) {
     case "race":
@@ -99,7 +102,8 @@ export function kindOf(type: Session["type"] | undefined, km: number): DayKind {
     case "test":
       return "intense";
     case undefined:
-      return km > 0 ? "facile" : "repos";
+      // Sortie libre (hors plan) : une longue sortie compte comme une sortie longue.
+      return km >= LONG_FREE_RUN_KM ? "long" : km > 0 ? "facile" : "repos";
     default:
       return "facile";
   }
@@ -255,4 +259,55 @@ export function validateProfile(p: Profile): string | null {
   if (!Number.isFinite(p.weightKg) || p.weightKg < 35 || p.weightKg > 200) return "Le poids doit être compris entre 35 et 200 kg.";
   if (!Number.isFinite(p.heightCm) || p.heightCm < 130 || p.heightCm > 230) return "La taille doit être comprise entre 130 et 230 cm.";
   return null;
+}
+
+// ---------- Après une sortie ----------
+
+export interface RecoveryAdvice {
+  /** Durée de la sortie, en minutes */
+  minutes: number;
+  level: "courte" | "moyenne" | "longue";
+  /** Glucides à prendre dans l'heure qui suit, en g (absent pour une sortie courte ou sans profil) */
+  carbsG?: [number, number];
+  /** Protéines à prendre dans l'heure qui suit, en g */
+  proteinG?: number;
+  items: string[];
+}
+
+const round5 = (x: number) => Math.round(x / 5) * 5;
+
+/**
+ * Conseils de récupération après une sortie, selon sa durée (et son type si elle suit le plan).
+ * Repères de nutrition sportive : 1 à 1,2 g de glucides par kg après un effort long, environ 0,3 g de protéines par kg.
+ * Sans profil, les quantités ne sont pas chiffrées.
+ */
+export function recoveryAdvice(a: Pick<Activity, "minutes" | "km">, profile: Profile | null, type?: Session["type"]): RecoveryAdvice {
+  const minutes = Math.round(a.minutes);
+  const hard = type === "quality" || type === "tempo" || type === "test" || type === "race";
+  const level: RecoveryAdvice["level"] = minutes < 45 && !hard ? "courte" : minutes >= 90 || type === "race" ? "longue" : "moyenne";
+  const w = profile?.weightKg;
+  const items: string[] = [];
+
+  if (level === "courte") {
+    items.push("Sortie courte : pas besoin d'encas particulier. Ton prochain repas, avec des glucides et des protéines, suffit.");
+    return { minutes, level, items };
+  }
+
+  const carbsG: [number, number] | undefined = w ? (level === "longue" ? [round5(w * 1), round5(w * 1.2)] : [round5(w * 0.8), round5(w * 1)]) : undefined;
+  const proteinG = w ? Math.min(40, Math.max(20, round5(w * 0.3))) : undefined;
+
+  items.push(
+    carbsG
+      ? `Dans l'heure qui suit : ${carbsG[0]} à ${carbsG[1]} g de glucides (riz, pâtes, pain, banane, compote) pour recharger les réserves.`
+      : "Dans l'heure qui suit : des glucides (riz, pâtes, pain, banane, compote) pour recharger les réserves."
+  );
+  items.push(
+    proteinG
+      ? `Ajoute environ ${proteinG} g de protéines (œufs, yaourt, poulet, tofu, fromage blanc) pour réparer les muscles.`
+      : "Ajoute 20 à 30 g de protéines (œufs, yaourt, poulet, tofu, fromage blanc) pour réparer les muscles."
+  );
+  if (level === "longue") items.push("Après un effort long, un second repas riche en glucides dans les 2 à 3 heures complète la récupération.");
+  if (hard) items.push("Séance intense : privilégie les glucides faciles à digérer si l'appétit tarde à venir (boisson, compote, banane).");
+  items.push("Bois pour compenser la transpiration : l'onglet Hydratation estime l'eau perdue.");
+  return { minutes, level, carbsG, proteinG, items };
 }

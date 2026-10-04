@@ -20,10 +20,12 @@ interface Props {
   onDelete: (id: string) => void;
   strava: StravaApi;
   onOpenProfile: () => void;
+  /** Ouvre la nutrition du jour d'une activité */
+  onOpenNutrition: (date: string) => void;
   paces: PaceModel | null;
 }
 
-export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete, strava, onOpenProfile, paces }: Props) {
+export default function Activities({ plan, done, activities, presetSessionId, onSave, onDelete, strava, onOpenProfile, onOpenNutrition, paces }: Props) {
   const today = todayISO();
   const sessions = plan.weeks.flatMap((w) => w.sessions);
   const byId = new Map(sessions.map((s) => [s.id, s]));
@@ -244,6 +246,9 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                   <>
                     <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} />
                     <div className="activity__actions">
+                      <button type="button" className="link" onClick={() => onOpenNutrition(a.date)}>
+                        Nutrition de ce jour
+                      </button>
                       <button type="button" className="link" onClick={() => startEdit(a)}>
                         Modifier
                       </button>

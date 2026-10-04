@@ -5,6 +5,7 @@ import {
   DAY_KIND_LABEL,
   dayTarget,
   recentFoods,
+  recoveryAdvice,
   totalsOf,
   type DayKind,
   type DayTarget,
@@ -41,6 +42,8 @@ interface Props {
   onToggleFavorite: (id: string) => void;
   /** Volet à ouvrir au départ (depuis le rappel d'hydratation) */
   startView?: View;
+  /** Jour à afficher au départ dans le suivi (depuis une activité) */
+  startDate?: string;
 }
 
 const KIND_SHORT: Record<DayKind, string> = { repos: "Repos", facile: "Facile", intense: "Intense", long: "Long", course: "Course" };
@@ -94,7 +97,7 @@ export default function Nutrition(props: Props) {
 function Daily(props: Props) {
   const { plan, done, activities, profile, foods, onSaveProfile } = props;
   const today = todayISO();
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(props.startDate ?? today);
 
   if (!profile) {
     return (
@@ -142,7 +145,10 @@ function Daily(props: Props) {
         </ul>
       </section>
 
-      <TargetCard target={target} eaten={totalsOf(dayFoods)} />
+      <div className="nutrition__main">
+        <TargetCard target={target} eaten={totalsOf(dayFoods)} />
+        <RecoveryCard plan={plan} activities={activities} profile={profile} date={date} />
+      </div>
 
       <Journal
         key={date}
@@ -162,6 +168,37 @@ function Daily(props: Props) {
         </p>
       </footer>
     </div>
+  );
+}
+
+/** Conseils de récupération pour les sorties du jour affiché. */
+function RecoveryCard({ plan, activities, profile, date }: { plan: Plan; activities: Activity[]; profile: Profile; date: string }) {
+  const runs = activities.filter((a) => a.date === date);
+  if (runs.length === 0) return null;
+  const sessions = plan.weeks.flatMap((w) => w.sessions);
+  return (
+    <section className="card recovery" aria-labelledby="recovery-title">
+      <h2 id="recovery-title" className="card__title">
+        {runs.length > 1 ? "Après tes sorties" : "Après ta sortie"}
+      </h2>
+      {runs.map((a) => {
+        const s = a.sessionId ? sessions.find((x) => x.id === a.sessionId) : undefined;
+        const r = recoveryAdvice(a, profile, s?.type);
+        return (
+          <div key={a.id} className="recovery__run">
+            <p className="target__kind">
+              {s ? s.title : "Sortie libre"} · {fmtKm(a.km)} km · {fmtDuration(r.minutes)}
+            </p>
+            <ul className="tips">
+              {r.items.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      <p className="hint">Repères de nutrition sportive, à adapter à ton appétit et à tes sensations.</p>
+    </section>
   );
 }
 

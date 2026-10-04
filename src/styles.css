@@ -4352,3 +4352,22 @@ body {
 .rchart__caption strong {
   color: var(--ink);
 }
+
+/* ---------- Nutrition : conseils après une sortie ---------- */
+
+.nutrition__main {
+  display: grid;
+  gap: 1rem;
+}
+
+.recovery__run + .recovery__run {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 64rem) {
+  .nutrition__main {
+    gap: 1.25rem;
+  }
+}

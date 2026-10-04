@@ -1,5 +1,5 @@
 import { generatePlan } from "../src/lib/plan.ts";
-import { bmr, dayTarget, duringAdvice, recentFoods, totalsOf, validateProfile, type Food, type Profile } from "../src/lib/nutrition.ts";
+import { bmr, dayTarget, duringAdvice, kindOf, recentFoods, recoveryAdvice, totalsOf, validateProfile, type Food, type Profile } from "../src/lib/nutrition.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -83,5 +83,22 @@ check("aliments récents sans doublon, récents d'abord", recents.length === 2 &
 // Profil
 check("profil valide", validateProfile(me) === null);
 check("profil invalide", validateProfile({ ...me, age: 10 }) !== null && validateProfile({ ...me, weightKg: NaN }) !== null && validateProfile({ ...me, heightCm: 300 }) !== null);
+
+// Sortie libre
+check("sortie libre : courte = facile, longue = sortie longue, aucune = repos", kindOf(undefined, 8) === "facile" && kindOf(undefined, 16) === "long" && kindOf(undefined, 0) === "repos");
+check("séance du plan : le type prime sur la distance", kindOf("easy", 18) === "facile" && kindOf("long", 10) === "long");
+
+// Récupération après une sortie
+const recShort = recoveryAdvice({ minutes: 30, km: 4 }, me);
+check("sortie courte : pas d'encas particulier", recShort.level === "courte" && recShort.carbsG === undefined && recShort.items.length === 1, recShort);
+const recMid = recoveryAdvice({ minutes: 60, km: 10 }, me);
+check("sortie moyenne : glucides 0,8 à 1 g/kg et protéines", recMid.level === "moyenne" && recMid.carbsG![0] === 55 && recMid.carbsG![1] === 70 && recMid.proteinG === 20, recMid);
+const recLong = recoveryAdvice({ minutes: 120, km: 20 }, me, "long");
+check("sortie longue : glucides 1 à 1,2 g/kg, second repas", recLong.level === "longue" && recLong.carbsG![0] === 70 && recLong.carbsG![1] === 85 && recLong.items.some((i) => i.includes("second repas")), recLong);
+check("protéines entre 20 et 40 g", recoveryAdvice({ minutes: 60, km: 10 }, { ...me, weightKg: 40 }).proteinG === 20 && recoveryAdvice({ minutes: 60, km: 10 }, { ...me, weightKg: 130 }).proteinG === 40);
+check("séance intense même courte : conseils de récupération", recoveryAdvice({ minutes: 40, km: 7 }, me, "quality").level === "moyenne");
+check("course : récupération longue", recoveryAdvice({ minutes: 50, km: 10 }, me, "race").level === "longue");
+check("sans profil : pas de quantité chiffrée", (() => { const r = recoveryAdvice({ minutes: 100, km: 15 }, null); return r.carbsG === undefined && r.proteinG === undefined && r.items.length >= 3; })());
+check("rappel de l'hydratation après une sortie moyenne ou longue", recMid.items.some((i) => i.includes("Hydratation")) && recLong.items.some((i) => i.includes("Hydratation")));
 
 process.exit(failures ? 1 : 0);
