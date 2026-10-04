@@ -1,6 +1,7 @@
 import { generatePlan } from "../src/lib/plan.ts";
 import {
   addActivity,
+  groupByMonth,
   parseMinutes,
   removeActivity,
   summarize,
@@ -73,5 +74,15 @@ check("régularité = faites / échues", sumLater.adherence !== null && sumLater
 check("résumé vide", summarize(plan, [], {}, "2026-10-03").avgPace === null);
 const totals = weeklyTotals(plan, [...sample, act("z", plan.weeks[0].startDate, 2, 12)]);
 check("totaux par semaine", totals[0].actualKm === 12 && totals[1].actualKm === 5 && totals[2].actualKm === 0 && totals[0].plannedKm === plan.weeks[0].totalKm, totals.slice(0, 3));
+
+// ---------- Regroupement par mois ----------
+const months = groupByMonth([act("a", "2026-09-30", 5, 30), act("b", "2026-10-02", 10, 60), act("c", "2026-09-01", 8, 48), act("d", "2026-10-02", 3, 20), act("e", "2025-12-31", 6, 40)]);
+check("mois du plus récent au plus ancien", months.map((m) => m.month).join() === "2026-10,2026-09,2025-12", months.map((m) => m.month));
+check("totaux d'un mois", months[0].activities.length === 2 && months[0].km === 13 && months[0].minutes === 80, months[0]);
+check("activités d'un mois triées du plus récent au plus ancien", months[1].activities.map((a) => a.id).join() === "a,c", months[1].activities.map((a) => a.id));
+check("l'année est distinguée", months[2].month === "2025-12" && months[2].km === 6);
+check("aucune activité, aucun mois", groupByMonth([]).length === 0);
+check("le regroupement ne modifie pas la liste d'origine", (() => { const l = [act("x", "2026-01-01", 1, 1), act("y", "2026-02-01", 1, 1)]; groupByMonth(l); return l[0].id === "x"; })());
+check("total de kilomètres arrondi", groupByMonth([act("p", "2026-03-01", 0.1, 1), act("q", "2026-03-02", 0.2, 1)])[0].km === 0.3);
 
 process.exit(failures ? 1 : 0);

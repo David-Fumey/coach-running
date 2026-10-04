@@ -132,6 +132,29 @@ export function summarize(plan: Plan, activities: Activity[], done: Record<strin
 /** Plus récentes d'abord. */
 export const byDateDesc = (a: Activity, b: Activity) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
 
+/** Les activités d'un mois civil, du plus récent au plus ancien. */
+export interface MonthGroup {
+  /** « AAAA-MM » */
+  month: string;
+  activities: Activity[];
+  km: number;
+  minutes: number;
+}
+
+/** Regroupe les activités par mois (le plus récent d'abord) ; chaque mois garde l'ordre du plus récent au plus ancien. */
+export function groupByMonth(activities: Activity[]): MonthGroup[] {
+  const groups = new Map<string, MonthGroup>();
+  for (const a of [...activities].sort(byDateDesc)) {
+    const month = a.date.slice(0, 7);
+    const g = groups.get(month) ?? { month, activities: [], km: 0, minutes: 0 };
+    g.activities.push(a);
+    g.km += a.km;
+    g.minutes += a.minutes;
+    groups.set(month, g);
+  }
+  return [...groups.values()].map((g) => ({ ...g, km: Math.round(g.km * 100) / 100, minutes: Math.round(g.minutes * 100) / 100 }));
+}
+
 /** « 1:05:30 », « 42:10 » ou « 45 » (minutes) → minutes décimales, null si invalide. */
 export function parseMinutes(raw: string): number | null {
   const parts = raw.trim().replace(",", ".").split(":");
