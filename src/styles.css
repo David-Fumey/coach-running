@@ -1300,8 +1300,72 @@ button {
   font-size: 0.9375rem;
 }
 
-.activity .link {
-  margin-right: 1rem;
+.activity__toggle {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0 1.75rem 0 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.activity__toggle .activity__head,
+.activity__toggle .activity__meta {
+  display: block;
+}
+
+.activity__toggle .activity__head {
+  display: flex;
+}
+
+.activity__chevron {
+  position: absolute;
+  right: 0.25rem;
+  top: 0.55rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.activity--open .activity__chevron {
+  top: 0.8rem;
+  transform: rotate(-135deg);
+}
+
+.activity__toggle:hover .activity__chevron {
+  border-color: var(--text, currentColor);
+}
+
+.activity--open {
+  border-left-color: var(--accent);
+}
+
+.activity__actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity__chevron {
+    transition: none;
+  }
 }
 
 /* ---------- 9. Nutrition ---------- */

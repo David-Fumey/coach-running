@@ -204,34 +204,36 @@ export default function Activities({ plan, done, activities, presetSessionId, on
           {sorted.map((a) => {
             const s = a.sessionId ? byId.get(a.sessionId) : undefined;
             return (
-              <li key={a.id} className="activity">
-                <div className="activity__head">
-                  <span className="session__date">{fmtDate(a.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
-                  <span className="activity__km">{fmtKm(a.km)} km</span>
-                </div>
-                <p className="activity__meta">
-                  {s ? s.title : "Sortie libre"}{a.source === "strava" ? " · Strava" : ""} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
-                  {a.avgHr ? ` · FC ${a.avgHr} bpm` : ""}
-                  {a.elevation ? ` · D+ ${a.elevation} m` : ""}
-                  {typeof a.temp === "number" ? ` · ${Math.round(a.temp)} °C` : ""}
-                  {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
-                </p>
+              <li key={a.id} className={`activity${openId === a.id ? " activity--open" : ""}`}>
+                <button type="button" className="activity__toggle" aria-expanded={openId === a.id} onClick={() => setOpenId(openId === a.id ? undefined : a.id)}>
+                  <span className="activity__head">
+                    <span className="session__date">{fmtDate(a.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
+                    <span className="activity__km">{fmtKm(a.km)} km</span>
+                  </span>
+                  <span className="activity__meta">
+                    {s ? s.title : "Sortie libre"}{a.source === "strava" ? " · Strava" : ""} · {fmtDuration(a.minutes)} · {fmtPace(paceOf(a))} /km
+                    {a.avgHr ? ` · FC ${a.avgHr} bpm` : ""}
+                    {a.elevation ? ` · D+ ${a.elevation} m` : ""}
+                    {typeof a.temp === "number" ? ` · ${Math.round(a.temp)} °C` : ""}
+                    {a.feeling ? ` · ${FEELINGS[a.feeling]}` : ""}
+                  </span>
+                  <span className="activity__chevron" aria-hidden="true" />
+                </button>
                 {s && <PaceCheck plan={plan} model={paces} session={s} pace={paceOf(a)} />}
                 {a.note && <p className="hint">{a.note}</p>}
-                {openId === a.id && <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} />}
-                <button type="button" className="link" aria-expanded={openId === a.id} onClick={() => setOpenId(openId === a.id ? undefined : a.id)}>
-                  {openId === a.id ? "Masquer le détail" : "Voir le détail"}
-                </button>{" "}
-                <button type="button" className="link" onClick={() => startEdit(a)}>
-                  Modifier
-                </button>{" "}
-                <button
-                  type="button"
-                  className="link link--danger"
-                  onClick={() => window.confirm("Supprimer cette activité ?") && onDelete(a.id)}
-                >
-                  Supprimer
-                </button>
+                {openId === a.id && (
+                  <>
+                    <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} />
+                    <div className="activity__actions">
+                      <button type="button" className="link" onClick={() => startEdit(a)}>
+                        Modifier
+                      </button>
+                      <button type="button" className="link link--danger" onClick={() => window.confirm("Supprimer cette activité ?") && onDelete(a.id)}>
+                        Supprimer
+                      </button>
+                    </div>
+                  </>
+                )}
               </li>
             );
           })}
