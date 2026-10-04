@@ -6,6 +6,7 @@ import VolumeChart from "./VolumeChart";
 import { CheckIcon } from "./icons";
 import PaceCard, { PaceLine } from "./PaceCard";
 import GoalCard from "./GoalCard";
+import WorkoutSteps from "./WorkoutSteps";
 import ShiftCard from "./ShiftCard";
 import type { Goal } from "../lib/goal";
 import type { PaceModel } from "../lib/paces";
@@ -103,7 +104,7 @@ function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekP
       <p className="week__focus">{week.focus}</p>
       <ul className="sessions">
         {week.sessions.map((s) => (
-          <SessionRow key={s.id} session={s} isDone={!!done[s.id]} isToday={s.date === today} onToggle={onToggle} pace={<PaceLine plan={plan} model={paces} session={s} />} />
+          <SessionRow key={s.id} session={s} isDone={!!done[s.id]} isToday={s.date === today} onToggle={onToggle} pace={<><PaceLine plan={plan} model={paces} session={s} /><WorkoutSteps plan={plan} model={paces} session={s} collapsed /></>} />
         ))}
       </ul>
     </details>

@@ -3237,3 +3237,148 @@ button {
   gap: 1rem;
   margin-top: 0.25rem;
 }
+
+/* ---------- Déroulé d'une séance pas à pas ---------- */
+
+.wo {
+  display: grid;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+}
+
+.wo__block {
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.wo__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.4375rem 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(90deg, #6b7280, #4b5563);
+}
+
+.wo__block--main .wo__head {
+  background: linear-gradient(90deg, #f59e0b, #dc2f2f);
+}
+
+.wo__block--strides .wo__head {
+  background: linear-gradient(90deg, #2bb3a3, #2f6fd6);
+}
+
+.wo__repeat {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.wo__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wo-step {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.wo-step:first-child {
+  border-top: 0;
+}
+
+.wo-step__n {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+
+.wo-step__body {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.wo-step__what strong {
+  font-weight: 700;
+}
+
+.wo-step__pace {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.wo-step--work .wo-step__pace {
+  color: var(--t-long);
+}
+
+.wo-step__effort {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.wo-step__kind {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--done);
+}
+
+.wo-step--rest .wo-step__kind {
+  color: var(--muted);
+}
+
+.wo-step--work {
+  border-left: 4px solid var(--t-long);
+}
+
+.wo-step--rest {
+  border-left: 4px solid var(--line-strong);
+}
+
+.wo-step--easy {
+  border-left: 4px solid var(--t-easy);
+}
+
+.wo-step--stride {
+  border-left: 4px solid var(--p-construction);
+}
+
+.wo__note {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.wo-toggle {
+  margin-top: 0.5rem;
+}
+
+.wo-toggle summary {
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--focus);
+}

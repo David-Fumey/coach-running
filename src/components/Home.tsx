@@ -6,6 +6,7 @@ import PlanHero from "./PlanHero";
 import { CheckIcon, ChevronIcon, Ring } from "./icons";
 import { currentWeekIndex } from "./PlanView";
 import { PaceLine } from "./PaceCard";
+import WorkoutSteps from "./WorkoutSteps";
 import type { PaceModel } from "../lib/paces";
 
 interface Props {
@@ -67,6 +68,7 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
             </div>
             <p className="session__details">{next.details}</p>
             <PaceLine plan={plan} model={paces} session={next} />
+            <WorkoutSteps plan={plan} model={paces} session={next} />
             <div className="actions">
               <button type="button" className="btn btn--primary" onClick={() => onLog(next.id)}>
                 Enregistrer cette séance
