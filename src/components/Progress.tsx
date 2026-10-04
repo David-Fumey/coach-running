@@ -16,7 +16,7 @@ import {
   type Scope,
 } from "../lib/progress";
 import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
-import { todayISO } from "../storage";
+import { todayISO, useStoredState } from "../storage";
 import Records from "./Records";
 import { TrendChart, VolumeChart, periodLabel, type TrendMetric, type VolumeMetric } from "./charts";
 
@@ -43,8 +43,12 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 /** Onglet « Progrès » : chiffres clés et graphiques, sur le programme en cours ou sur tout l'historique. */
 export default function Progress({ plan, done, activities }: Props) {
   const today = todayISO();
-  const [scope, setScope] = useState<Scope>("programme");
-  const [grain, setGrain] = useState<Grain>("semaine");
+  // Choix mémorisés d'une visite à l'autre (préférence d'affichage, hors sauvegarde)
+  const [pref, setPref] = useStoredState<{ scope: Scope; grain: Grain }>("foulee.progressview.v1", { scope: "programme", grain: "semaine" });
+  const scope: Scope = SCOPES.some((x) => x.id === pref.scope) ? pref.scope : "programme";
+  const grain: Grain = GRAINS.some((x) => x.id === pref.grain) ? pref.grain : "semaine";
+  const setScope = (v: Scope) => setPref({ scope: v, grain });
+  const setGrain = (v: Grain) => setPref({ scope, grain: v });
   /** Début de la fenêtre choisi avec les flèches ; null = fenêtre par défaut */
   const [startPick, setStartPick] = useState<number | null>(null);
   const [selPick, setSelPick] = useState<number | null>(null);
