@@ -3939,6 +3939,7 @@ body {
   }
 
   .home > .hero,
+  .home > .shift-suggest,
   .home > .next {
     grid-column: 1 / -1;
   }

@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { addDays, diffDays, generatePlan, weekdayIndex, type Plan } from "../src/lib/plan.ts";
-import { MAX_SHIFT_WEEKS, canUndoShift, resumeFactor, shiftPlan } from "../src/lib/shift.ts";
+import { MAX_SHIFT_WEEKS, MISSED_THRESHOLD, canUndoShift, missedStreak, resumeFactor, shiftPlan } from "../src/lib/shift.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -117,6 +117,23 @@ check("annulation impossible si une séance modifiée est validée", !canUndoShi
 check("annulation impossible si une activité est liée à une séance modifiée", !canUndoShift(plan, p1, {}, [{ id: "a", date: "2026-10-20", km: 5, minutes: 30, sessionId: changed.id }]));
 check("annulation impossible sans plan précédent", !canUndoShift(null, p1, {}, []));
 check("annulation impossible si la séance validée n'existe pas dans l'ancien plan", !canUndoShift(plan, p1, { "s-2030-01-01": true }, []));
+
+// ---------- Séances manquées d'affilée ----------
+const late = "2026-10-21"; // mercredi de la semaine suivante : les séances de la semaine du 12 sont passées
+const pastIds = sessionsOf(plan).filter((x) => x.date < late && x.date >= "2026-10-12").map((x) => x.id);
+const m0 = missedStreak(plan, {}, [], late);
+check("plusieurs séances manquées de suite : décalage proposé", !!m0 && m0.count >= MISSED_THRESHOLD && m0.suggestedWeeks >= 1 && m0.suggestedWeeks <= 3, m0);
+check("la série remonte jusqu'au début du plan si rien n'est fait", !!m0 && m0.firstDate === sessionsOf(plan).find((x) => x.type !== "race")!.date && m0.lastDate < late, m0);
+check("rien à proposer sous le seuil", missedStreak(plan, {}, [], "2026-09-16") === null);
+check("une séance faite récemment referme la série", missedStreak(plan, { [pastIds[pastIds.length - 1]]: true }, [], late) === null);
+check("une activité liée compte comme faite", missedStreak(plan, {}, [{ id: "a", date: "2026-10-20", km: 5, minutes: 30, sessionId: pastIds[pastIds.length - 1] }], late) === null);
+check("une séance faite plus tôt limite la série", (() => {
+  const all = sessionsOf(plan).filter((x) => x.date < late);
+  const m = missedStreak(plan, { [all[all.length - 4].id]: true }, [], late);
+  return !!m && m.count === 3;
+})());
+check("juste après un décalage, plus de proposition", missedStreak(p1, {}, [], today) === null);
+check("pas de proposition si la course est passée", missedStreak(plan, {}, [], "2027-02-01") === null);
 
 console.log(failures === 0 ? "\nTout est bon." : `\n${failures} échec(s).`);
 process.exit(failures === 0 ? 0 : 1);

@@ -25,6 +25,8 @@ interface Props {
   paces: PaceModel | null;
   /** Invitation à renseigner le temps d'un test de 5 km, s'il y en a un à saisir */
   testCard?: ReactNode;
+  /** Proposition de décalage après des séances manquées */
+  suggestion?: ReactNode;
 }
 
 const TYPE_LABEL: Record<Session["type"], string> = {
@@ -42,7 +44,7 @@ const TYPE_LABEL: Record<Session["type"], string> = {
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 /** Accueil du hub : la prochaine séance, la semaine en cours et quelques chiffres. */
-export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, onOpenDrills, onToggle, paces, testCard }: Props) {
+export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, onOpenDrills, onToggle, paces, testCard, suggestion }: Props) {
   const today = todayISO();
   const week = plan.weeks[currentWeekIndex(plan, today)];
   const allSessions = plan.weeks.flatMap((w) => w.sessions);
@@ -60,6 +62,8 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
       <PlanHero input={plan.input} goal={paces?.goal ?? null} />
 
       {testCard}
+
+      {suggestion}
 
       {todayExtra && (
         <section className="card next next--strength" aria-labelledby="extra-title">

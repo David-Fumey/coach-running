@@ -115,3 +115,42 @@ export function canUndoShift(previous: Plan | null, current: Plan, done: Record<
   const used = [...Object.keys(done), ...activities.map((a) => a.sessionId).filter((id): id is string => !!id)];
   return used.every((id) => before.get(id) !== undefined && before.get(id) === after.get(id));
 }
+
+/** Séances de course manquées d'affilée avant aujourd'hui, et durée de pause qu'on peut proposer. */
+export interface MissedStreak {
+  count: number;
+  /** Date de la plus ancienne et de la plus récente séance manquée de la série */
+  firstDate: string;
+  lastDate: string;
+  suggestedWeeks: number;
+}
+
+/** Nombre de séances manquées de suite à partir duquel on propose un décalage. */
+export const MISSED_THRESHOLD = 3;
+
+/**
+ * Série de séances manquées en remontant depuis la plus récente séance passée : ni validée, ni liée à une activité.
+ * La série s'arrête à la première séance faite, et à une semaine de pause (un décalage déjà fait la referme).
+ * Retourne null sous le seuil, ou si le décalage n'est pas possible (course passée, plus rien à reporter, reprise trop tard).
+ */
+export function missedStreak(plan: Plan, done: Record<string, boolean>, activities: Activity[], today: string): MissedStreak | null {
+  const linked = new Set(activities.map((a) => a.sessionId).filter((id): id is string => !!id));
+  const missed: string[] = [];
+  outer: for (let i = plan.weeks.length - 1; i >= 0; i--) {
+    const w = plan.weeks[i];
+    if (w.startDate > today) continue;
+    if (w.paused) break;
+    for (const s of [...w.sessions].reverse()) {
+      if (s.date >= today || s.type === "race") continue;
+      if (done[s.id] || linked.has(s.id)) break outer;
+      missed.push(s.date);
+    }
+  }
+  if (missed.length < MISSED_THRESHOLD) return null;
+  const firstDate = missed[missed.length - 1];
+  const suggestedWeeks = Math.min(3, Math.max(1, Math.ceil(diffDays(firstDate, today) / 7)));
+  for (let w = suggestedWeeks; w >= 1; w--) {
+    if (shiftPlan(plan, w, done, today).ok) return { count: missed.length, firstDate, lastDate: missed[0], suggestedWeeks: w };
+  }
+  return null;
+}

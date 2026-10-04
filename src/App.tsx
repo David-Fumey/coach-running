@@ -16,6 +16,7 @@ import SetupForm from "./components/SetupForm";
 import PlanReview from "./components/PlanReview";
 import PlanView from "./components/PlanView";
 import Home from "./components/Home";
+import ShiftSuggestion from "./components/ShiftSuggestion";
 import Activities from "./components/Activities";
 import Progress from "./components/Progress";
 import Nutrition from "./components/Nutrition";
@@ -319,6 +320,7 @@ export default function App() {
             onToggle={toggle}
             paces={paces}
             testCard={testCard(false)}
+            suggestion={<ShiftSuggestion plan={plan} done={done} activities={activities} onShift={shiftProgram} />}
           />
         )}
         {tab === "programme" && (
