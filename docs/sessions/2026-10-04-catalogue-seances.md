@@ -67,3 +67,17 @@
 - Tests : `npm run test:control` (16e script) : placement, mise à jour d'un ancien plan, saisie, séance en attente avec Strava, priorité des références, sauvegarde.
 - Vérifié dans le navigateur avec un plan daté du passé : la carte propose le meilleur 5 km relevé par Strava et chiffre l'effet sur l'allure facile (rien n'a été enregistré, plan d'origine remis).
 - Pistes restantes : jours de repos et renforcement ; deuxième séance de qualité sur 5 et 6 jours pour les avancés ; test de 30 minutes comme alternative.
+
+## Jours de repos et renforcement (ajout)
+
+- **Renforcement** (`src/lib/strength.ts`, pur) : séances sans matériel placées les jours sans course, rangées à part dans `Week.extras` (type `strength`, `km: 0`, durée en minutes, identifiant `r-AAAA-MM-JJ`). Elles ne comptent ni dans les kilomètres, ni dans la régularité, ni dans le rapprochement avec les sorties Strava ; elles se valident comme les autres séances.
+- **Placement** : un jour de repos qui n'est jamais la veille d'une séance dure (qualité, tempo, test, sortie longue, course). Base et construction : 2 séances par semaine (1 pour un débutant, ou avec 5 à 6 jours de course) ; phase spécifique : 1 ; semaine de récupération et affûtage : une mobilité de 10 minutes ; semaine de course : aucune. Deux séances ne se suivent pas. Sans jour libre, pas de renforcement.
+- **Programmes** : « jambes et fessiers » (squats, fentes, pont fessier, montées sur marche, mollets) en alternance avec « gainage et stabilité » (planches, dead-bug, quadrupédie, pont sur une jambe), et « mobilité et détente » (hanches, ischios, chevilles, dos, rotation). Séries : 2 en base et en spécifique, 3 en construction, ±1 selon le niveau ; répétitions et tenues qui augmentent à chaque retour du programme (plafonnées) ; débutant ×0,8, avancé ×1,25. Durée estimée de 10 à 35 minutes.
+- **Jours de repos** (`src/lib/rest.ts`) : l'Accueil affiche une carte « Jour de repos » les jours sans course ni renforcement pendant la préparation (pas pendant une pause du programme) : un conseil général, un conseil selon la veille (sortie longue, séance dure, course) et le lendemain (fraîcheur avant une séance dure, veille de course), et la consigne de consulter si une douleur persiste.
+- **Écran** : Programme (séance repliable « Voir les exercices », durée à la place des kilomètres), Accueil (carte « Aujourd'hui » avec les exercices et « Séance faite » le jour d'un renforcement ; pastille « R » dans la semaine). `StrengthSteps.tsx`, `RestCard.tsx`.
+- **Décalage du programme** : les semaines de pause n'ont pas de renforcement, les semaines régénérées en ont.
+- **Mise à jour d'un plan enregistré** : ajoute le renforcement à venir (pas dans le passé) aux semaines qui n'en ont pas. `upgradableCount` le compte.
+- **Sauvegarde** : `extras` validés à l'import ; les anciennes sauvegardes sans renforcement restent lisibles.
+- Tests : `npm run test:strength` (17e script) : placement sur 96 combinaisons (courses, niveaux, fréquences, jour de la sortie longue), contenu et progression, conseils de repos, décalage, ancien plan, sauvegarde.
+- Vérifié dans le navigateur (plans temporaires, ton plan remis tel quel) : semaine avec renforcement, carte « Aujourd'hui », carte de repos.
+- Pistes restantes : deuxième séance de qualité sur 5 et 6 jours pour les avancés, test de 30 minutes, renforcement avec charges, validation du contenu par un coach ou un kiné.

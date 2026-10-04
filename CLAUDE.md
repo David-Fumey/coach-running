@@ -12,7 +12,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 4. Import automatique des sorties de la montre Garmin via Strava (v0.6 : fait, à essayer avec un vrai compte).
 5. Écran Progrès filtrable : programme actuel ou total, graphiques par semaine, mois ou année (v0.7, fait), avec records personnels (v0.8, fait).
 6. Allures cibles par séance, déduites de la moyenne des sorties enregistrées (v0.9, fait), avec temps objectif de course (v0.10, fait), et décalage du programme avec pause (v0.11, fait), et onglet Hydratation (v0.12, fait).
-7. Déroulé pas à pas des séances, avec l'allure de chaque portion (v0.13, fait), et catalogue de séances de qualité variées : côtes, pyramides, intervalles au seuil, sortie progressive (v0.14, fait), puis sorties longues variées : progressive, alternance, blocs au seuil (v0.15, fait), puis niveaux : course/marche pour les débutants, deux séances de travail pour les avancés sur 4 jours (v0.16, fait), et test de 5 km qui recale les allures (v0.17, fait).
+7. Déroulé pas à pas des séances, avec l'allure de chaque portion (v0.13, fait), et catalogue de séances de qualité variées : côtes, pyramides, intervalles au seuil, sortie progressive (v0.14, fait), puis sorties longues variées : progressive, alternance, blocs au seuil (v0.15, fait), puis niveaux : course/marche pour les débutants, deux séances de travail pour les avancés sur 4 jours (v0.16, fait), et test de 5 km qui recale les allures (v0.17, fait), puis renforcement les jours sans course et conseils de repos (v0.18, fait).
 
 ## Stack
 
@@ -44,6 +44,7 @@ npm run test:shift       # vérifie le décalage du programme (pause, reprise, a
 npm run test:hydration   # vérifie le suivi d'eau et l'estimation de la transpiration
 npm run test:strava      # vérifie l'import Strava (conversion, fusion sans doublon, client réseau simulé)
 npm run test:steps       # vérifie le déroulé pas à pas des séances (blocs, répétitions, allures par portion)
+npm run test:strength    # vérifie le renforcement (placement, programmes, conseils de repos)
 npm run test:control     # vérifie le test de 5 km (placement, saisie, effet sur les allures)
 npm run test:workouts    # vérifie le catalogue de séances (rotation, progression, cohérence, mise à jour d'un ancien plan)
 ```
@@ -52,7 +53,7 @@ npm run test:workouts    # vérifie le catalogue de séances (rotation, progress
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts`, `paces.ts`, `goal.ts`, `shift.ts`, `hydration.ts`, `steps.ts`, `workouts.ts` ou `tests.ts` doit garder les seize scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts`, `paces.ts`, `goal.ts`, `shift.ts`, `hydration.ts`, `steps.ts`, `workouts.ts`, `tests.ts`, `strength.ts` ou `rest.ts` doit garder les dix-sept scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 
