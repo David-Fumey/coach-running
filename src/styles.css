@@ -3931,21 +3931,24 @@ body {
     font-size: 2.5rem;
   }
 
-  /* Accueil : le héros en haut, la séance à gauche, la semaine et le bilan à droite. */
+  /* Accueil : le héros et la séance du jour en pleine largeur, la semaine et le bilan côte à côte dessous. */
   .home {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto 1fr;
     align-items: start;
     gap: 1.25rem;
   }
 
   .home > .hero,
-  .home > .next--strength {
+  .home > .next {
     grid-column: 1 / -1;
   }
 
-  .home > .next:not(.next--strength) {
-    grid-row: span 2;
+  /* Les blocs de la séance (échauffement, travail, retour au calme) se rangent en colonnes. */
+  .next .wo {
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    align-items: start;
+    gap: 1rem;
   }
 
   /* Programme : les cartes d'outils par deux, la liste des semaines en pleine largeur. */

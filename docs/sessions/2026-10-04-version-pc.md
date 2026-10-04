@@ -10,7 +10,7 @@ Tout est dans `src/styles.css` (section « Version PC », à partir de 1024 px d
 
 - **Menu latéral** à la place de la barre du bas : nom de l'application en haut, onglets en liste verticale avec leur couleur, onglet actif teinté. Le contenu laisse la place au menu (`body:has(.tabbar)`).
 - **Contenu plus large** : jusqu'à 72 rem au lieu de 44 rem dans le hub. Les écrans de démarrage (formulaire, relecture du plan) gardent leur largeur, comme la page Profil.
-- **Accueil** : le héros en haut sur toute la largeur, la séance du jour à gauche, la semaine et le bilan empilés à droite.
+- **Accueil** : le héros et la prochaine séance en pleine largeur (les blocs échauffement, séance et retour au calme se rangent côte à côte), puis la semaine et le bilan côte à côte dessous.
 - **Programme** : les cartes d'outils (nouvelles séances, graphique, objectif, allures, décalage) deux par deux ; la liste des semaines reste sur une seule colonne, en pleine largeur.
 - **Activités** : sorties sur deux colonnes ; une sortie ouverte prend toute la largeur et affiche ses deux courbes côte à côte.
 - **Exercices** : repères et routine côte à côte, cartes sur deux colonnes.
