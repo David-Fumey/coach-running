@@ -57,7 +57,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0a1120;
     --surface: #121c31;
     --surface-2: #17243d;
@@ -84,6 +84,43 @@
     --hero-to: #2d4a9c;
     --shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 4px 14px rgb(0 0 0 / 0.22);
   }
+}
+
+/* Thème sombre forcé depuis le profil */
+:root[data-theme="dark"] {
+  --bg: #0a1120;
+  --surface: #121c31;
+  --surface-2: #17243d;
+  --ink: #ecf1fb;
+  --muted: #9aa8c0;
+  --line: #25344f;
+  --line-strong: #3a4c6d;
+  --done: #3fc1cc;
+  --danger: #ff8a80;
+  --focus: #7aa7ff;
+
+  --p-base: #4f9ca9;
+  --p-construction: #4f86e8;
+  --p-specifique: #8a73f0;
+  --t-easy: #4f9ca9;
+  --t-quality: #8a73f0;
+  --t-tempo: #4f86e8;
+  --t-long: #f08a55;
+  --m-fat: #3fc1cc;
+  --c-green: #4cc38a;
+  --tab-home: #f2b134;
+
+  --hero-from: #1a2756;
+  --hero-to: #2d4a9c;
+  --shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 4px 14px rgb(0 0 0 / 0.22);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 /* ---------- 2. Base ---------- */

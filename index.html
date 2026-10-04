@@ -8,6 +8,13 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
+    <script>
+      // Applique le thème choisi avant l'affichage, pour éviter un flash.
+      try {
+        var t = JSON.parse(localStorage.getItem("foulee.theme.v1"));
+        if (t === "clair" || t === "sombre") document.documentElement.setAttribute("data-theme", t === "clair" ? "light" : "dark");
+      } catch (e) {}
+    </script>
     <title>Runner – plan de course</title>
   </head>
   <body>

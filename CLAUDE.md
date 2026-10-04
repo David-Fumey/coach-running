@@ -20,7 +20,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 ## Stack
 
 - Vite + React 19 + TypeScript, sans backend.
-- Données dans le `localStorage` (clés `foulee.plan.v1`, `foulee.done.v1`, `foulee.activities.v1`, `foulee.confirmed.v1`, `foulee.profile.v1`, `foulee.foods.v1`, `foulee.favorites.v1` (recettes favorites), `foulee.shopping.v1` (liste de courses, hors sauvegarde), `foulee.water.v1`, `foulee.sweat.v1`, `foulee.tests.v1` (tests de 5 km), `foulee.lossseen.v1` (rappels d'hydratation fermés, hors sauvegarde), `foulee.progressview.v1` (période et portée choisies dans Progrès, hors sauvegarde), `foulee.pace.v1` pour l'allure moyenne saisie à la main, `foulee.goal.v1` pour le temps objectif, `foulee.planprev.v1` pour le plan d'avant le dernier décalage (hors sauvegarde), `foulee.shiftseen.v1` pour la proposition de décalage fermée (hors sauvegarde), plus `foulee.strava.v1` pour la connexion Strava). Une sauvegarde des données se télécharge et se réimporte en JSON depuis la page Profil (`src/lib/backup.ts`) ; elle n'inclut jamais la clé `foulee.strava.v1` (identifiant, secret et jetons Strava).
+- Données dans le `localStorage` (clés `foulee.plan.v1`, `foulee.done.v1`, `foulee.activities.v1`, `foulee.confirmed.v1`, `foulee.profile.v1`, `foulee.foods.v1`, `foulee.favorites.v1` (recettes favorites), `foulee.shopping.v1` (liste de courses, hors sauvegarde), `foulee.theme.v1` (thème clair, sombre ou automatique, hors sauvegarde), `foulee.water.v1`, `foulee.sweat.v1`, `foulee.tests.v1` (tests de 5 km), `foulee.lossseen.v1` (rappels d'hydratation fermés, hors sauvegarde), `foulee.progressview.v1` (période et portée choisies dans Progrès, hors sauvegarde), `foulee.pace.v1` pour l'allure moyenne saisie à la main, `foulee.goal.v1` pour le temps objectif, `foulee.planprev.v1` pour le plan d'avant le dernier décalage (hors sauvegarde), `foulee.shiftseen.v1` pour la proposition de décalage fermée (hors sauvegarde), plus `foulee.strava.v1` pour la connexion Strava). Une sauvegarde des données se télécharge et se réimporte en JSON depuis la page Profil (`src/lib/backup.ts`) ; elle n'inclut jamais la clé `foulee.strava.v1` (identifiant, secret et jetons Strava).
 - Polices (Barlow Condensed, Source Sans 3) embarquées via `@fontsource` : aucune requête vers un service tiers, hors ligne compris. Le style est dans `src/styles.css` (jetons en tête de fichier, thèmes clair et sombre automatiques).
 - Parcours : formulaire → relecture du plan → validation → hub à onglets (Accueil, Programme, Activités, Progrès, Exercices, Nutrition).
 - Mise en page : pensée d'abord pour le téléphone (barre d'onglets en bas) ; à partir de 64 rem (1024 px) la section « Version PC » de `src/styles.css` passe en menu latéral et en pleine largeur ou deux colonnes selon l'écran. Vérifier un changement d'interface à 375, 1024 et 1400 px.
@@ -52,13 +52,14 @@ npm run test:strength    # vérifie le renforcement (placement, programmes, cons
 npm run test:control     # vérifie le test de 5 km (placement, saisie, effet sur les allures)
 npm run test:workouts    # vérifie le catalogue de séances (rotation, progression, cohérence, mise à jour d'un ancien plan)
 npm run test:drills      # vérifie les exercices d'échauffement et d'étirements et leurs routines
+npm run test:theme       # vérifie les choix de thème (clair, sombre, automatique)
 ```
 
 ## Conventions
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts`, `paces.ts`, `goal.ts`, `shift.ts`, `hydration.ts`, `steps.ts`, `workouts.ts`, `tests.ts`, `strength.ts`, `rest.ts`, `drills.ts`, `figures.ts` ou `poses.ts` doit garder les dix-huit scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts`, `paces.ts`, `goal.ts`, `shift.ts`, `hydration.ts`, `steps.ts`, `workouts.ts`, `tests.ts`, `strength.ts`, `rest.ts`, `drills.ts`, `figures.ts`, `poses.ts` ou `theme.ts` doit garder les dix-neuf scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 

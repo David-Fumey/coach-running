@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { generatePlan, type Plan, type PlanInput } from "./lib/plan";
 import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
 import { toggleFavorite } from "./lib/recipes";
+import { THEME_KEY, themeAttribute, validTheme, type Theme } from "./lib/theme";
 import { canUndoShift, shiftPlan } from "./lib/shift";
 import { upgradePlan } from "./lib/workouts";
 import { latestTest, withTest, type TestResult } from "./lib/tests";
@@ -36,6 +37,13 @@ export default function App() {
   const [confirmed, setConfirmed] = useStoredState<boolean>("foulee.confirmed.v1", false);
   // Profil et journal alimentaire ne dépendent pas du plan : ils survivent à sa recréation.
   const [profile, setProfile] = useStoredState<Profile | null>("foulee.profile.v1", null);
+  const [storedTheme, setTheme] = useStoredState<Theme>(THEME_KEY, "auto");
+  const theme: Theme = validTheme(storedTheme) ? storedTheme : "auto";
+  useEffect(() => {
+    const attr = themeAttribute(theme);
+    if (attr) document.documentElement.setAttribute("data-theme", attr);
+    else document.documentElement.removeAttribute("data-theme");
+  }, [theme]);
   const [favorites, setFavorites] = useStoredState<string[]>("foulee.favorites.v1", []);
   const [foods, setFoods] = useStoredState<Food[]>("foulee.foods.v1", []);
   const [water, setWater] = useStoredState<Water[]>("foulee.water.v1", []);
@@ -253,6 +261,8 @@ export default function App() {
             getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water, sweat, tests, favorites }, new Date())}
             onImport={importData}
             strava={strava}
+            theme={theme}
+            onChangeTheme={setTheme}
             onReset={() => {
               applySnapshot(EMPTY_SNAPSHOT);
               strava.reset();

@@ -8,6 +8,7 @@ import { todayISO } from "../storage";
 import type { StravaApi } from "../useStrava";
 import ProfileForm from "./ProfileForm";
 import StravaCard from "./StravaCard";
+import { THEMES, type Theme } from "../lib/theme";
 
 interface Props {
   profile: Profile | null;
@@ -21,10 +22,12 @@ interface Props {
   onImport: (text: string) => string | null;
   onReset: () => void;
   strava: StravaApi;
+  theme: Theme;
+  onChangeTheme: (t: Theme) => void;
 }
 
 /** Page « Mon profil » : identité, morphologie, et gestion des données locales (sauvegarde en fichier). */
-export default function ProfilePage({ profile, plan, activityCount, foodCount, onSaveProfile, getBackup, onImport, onReset, strava }: Props) {
+export default function ProfilePage({ profile, plan, activityCount, foodCount, onSaveProfile, getBackup, onImport, onReset, strava, theme, onChangeTheme }: Props) {
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -74,6 +77,20 @@ export default function ProfilePage({ profile, plan, activityCount, foodCount, o
           Profil enregistré.
         </p>
       )}
+
+      <section className="card" aria-labelledby="theme-title">
+        <h2 id="theme-title" className="card__title">
+          Apparence
+        </h2>
+        <p className="hint">Automatique suit le réglage de ton appareil. Ce choix reste sur cet appareil.</p>
+        <div className="chips" role="group" aria-label="Thème">
+          {THEMES.map((t) => (
+            <button key={t.id} type="button" className="chip-btn" aria-pressed={theme === t.id} onClick={() => onChangeTheme(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <StravaCard strava={strava} />
 
