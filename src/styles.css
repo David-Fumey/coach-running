@@ -3961,8 +3961,7 @@ body {
     grid-column: 1 / -1;
   }
 
-  /* Listes de cartes sur deux colonnes ; une carte ouverte ne déforme pas sa voisine. */
-  .weeks,
+  /* Listes de cartes sur deux colonnes (les semaines du programme restent sur une seule) ; une carte ouverte ne déforme pas sa voisine. */
   .activity-list,
   .recipe-list,
   .topic-list {
