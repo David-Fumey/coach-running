@@ -1,3 +1,5 @@
+import { VIEW, layout, points } from "../src/lib/figures.ts";
+import { POSES } from "../src/lib/poses.ts";
 import { DRILLS, GUIDE, ZONE_LABEL, doseLabel, drillSeconds, drillsOf, stretchRoutine, warmupRoutine, type Drill } from "../src/lib/drills.ts";
 
 let failures = 0;
@@ -51,6 +53,20 @@ check("la version courte est incluse dans la complète", short.drills.length >= 
 check("la complète est plus longue que la courte", full.minutes > short.minutes, [short.minutes, full.minutes]);
 check("durées d'étirements raisonnables", short.minutes >= 3 && short.minutes <= 10 && full.minutes <= 20, [short.minutes, full.minutes]);
 check("la version courte couvre mollets, cuisses, ischios, fessiers, hanches", ["mollets", "cuisses", "ischios", "fessiers", "hanches"].every((z) => short.drills.some((d) => d.zone === z)));
+
+// ---------- Illustrations ----------
+check("chaque exercice a une ou deux images", DRILLS.every((d) => (POSES[d.id]?.length ?? 0) >= 1 && POSES[d.id].length <= 2), DRILLS.filter((d) => !POSES[d.id]).map((d) => d.id));
+check("aucune image sans exercice", Object.keys(POSES).every((id) => DRILLS.some((d) => d.id === id)));
+check("chaque image a une légende", Object.values(POSES).every((fr) => fr.every((f) => f.label.length > 5)));
+const frames = Object.entries(POSES).flatMap(([id, fr]) => fr.map((f) => ({ id, label: f.label, l: layout(f.pose) })));
+check("tous les points sont finis", frames.every((f) => points(f.l).every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))));
+const outside = frames.filter((f) => points(f.l).some((p) => p.x < 2 || p.x > VIEW.w - 2 || p.y < 2 || p.y > VIEW.h - 2));
+check("tous les personnages restent dans le cadre", outside.length === 0, outside.map((f) => f.id + " : " + f.label));
+check("le personnage ne passe pas sous le sol", frames.every((f) => points(f.l).every((p) => p.y <= f.l.floor + 6)), frames.filter((f) => points(f.l).some((p) => p.y > f.l.floor + 6)).map((f) => f.id));
+check("le mur est à droite des mains et dans le cadre", frames.every((f) => f.l.wallX === undefined || (f.l.wallX > 0 && f.l.wallX < VIEW.w)));
+check("la marche des ischio-jambiers est dessinée", layout(POSES.ischios[0].pose).box !== undefined);
+check("la posture debout tient sur le sol", (() => { const l = layout(POSES.squats[0].pose); return Math.max(...points(l).map((p) => p.y)) <= l.floor + 1 && Math.max(...l.segs.flatMap((s) => [s.a.y, s.b.y])) >= l.floor - 1; })());
+check("la tête est au-dessus des pieds debout", (() => { const l = layout(POSES.squats[0].pose); return l.head.y < Math.min(...l.segs.map((s) => Math.min(s.a.y, s.b.y))) + 5; })());
 
 console.log(failures === 0 ? "\nTout est bon." : `\n${failures} échec(s).`);
 process.exit(failures === 0 ? 0 : 1);
