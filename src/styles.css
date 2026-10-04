@@ -3644,6 +3644,9 @@ body {
   --tab: var(--p-specifique);
 }
 .tabbar__item:nth-child(5) {
+  --tab: var(--t-long);
+}
+.tabbar__item:nth-child(6) {
   --tab: var(--c-green);
 }
 .tabbar__item .tabbar__icon {
@@ -3656,4 +3659,111 @@ body {
 }
 .tabbar__item[aria-current="page"] .tabbar__label {
   color: var(--tab);
+}
+
+/* ---------- Exercices ---------- */
+
+.drills {
+  display: grid;
+  gap: 1rem;
+}
+
+.drills__intro {
+  border-left: 3px solid var(--accent);
+}
+
+.drills__intro--etirement {
+  border-left-color: var(--p-specifique);
+}
+
+.drills__order {
+  list-style: none;
+  counter-reset: drill;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.drills__order li {
+  counter-increment: drill;
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.drills__order li::before {
+  content: counter(drill);
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.drills__jump {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drills__jump:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.drills__dose {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.drills__steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.drills__steps li::marker {
+  color: var(--c, var(--accent));
+  font-weight: 700;
+}
+
+.topic--zone-chevilles {
+  --c: var(--m-fat);
+}
+.topic--zone-mollets {
+  --c: var(--p-base);
+}
+.topic--zone-cuisses {
+  --c: var(--m-protein);
+}
+.topic--zone-ischios {
+  --c: var(--t-long);
+}
+.topic--zone-fessiers {
+  --c: var(--p-specifique);
+}
+.topic--zone-hanches {
+  --c: var(--p-construction);
+}
+.topic--zone-dos {
+  --c: var(--c-green);
+}
+.topic--zone-corps {
+  --c: var(--accent);
 }

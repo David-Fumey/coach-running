@@ -57,6 +57,13 @@ export const LeafIcon = () => (
   </Svg>
 );
 
+export const StretchIcon = () => (
+  <Svg>
+    <circle cx="12" cy="4.5" r="1.8" />
+    <path d="M12 7.5v6M12 13.5l-3 6M12 13.5l3 6M12 9 6 5.5M12 9l6-3.5" />
+  </Svg>
+);
+
 export const ChevronIcon = () => (
   <Svg>
     <path d="m9 6 6 6-6 6" />

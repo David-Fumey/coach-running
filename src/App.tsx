@@ -23,6 +23,7 @@ import ProfilePage from "./components/ProfilePage";
 import type { Food, Profile } from "./lib/nutrition";
 import { useStrava } from "./useStrava";
 import TabBar, { TABS, type Tab } from "./components/TabBar";
+import Drills from "./components/Drills";
 
 export type PlanFormValues = Omit<PlanInput, "today">;
 
@@ -343,6 +344,7 @@ export default function App() {
           />
         )}
         {tab === "progres" && <Progress plan={plan} done={done} activities={activities} />}
+        {tab === "exercices" && <Drills />}
         {tab === "nutrition" && (
           <Nutrition
             plan={plan}
