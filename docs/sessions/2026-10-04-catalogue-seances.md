@@ -46,3 +46,12 @@
 - `targetsFor` : sortie longue facile = comparable à la cible ; avec un effort au programme, allure facile puis allures de l'effort (non comparable). Avec un temps objectif, l'allure de course devient l'allure objectif.
 - Les anciennes sorties longues gardent leur affichage d'avant ; `upgradePlan` les met aussi à jour (la carte du Programme le précise).
 - Tests : `test:workouts` couvre la distance du déroulé, la rotation, les formats, la récupération et l'affûtage faciles.
+
+## Niveaux (ajout)
+
+- **Débutant qui court peu** (niveau Débutant et 10 km par semaine ou moins, ou rien de saisi) : les premières semaines alternent **course et marche**. Sept paliers de plus en plus de course (1 min / 1 min 30 de marche, puis 1 min 30, 2, 3, 5, 8 et 10 min de course), répartis sur 40 % de la préparation (3 à 8 semaines). Concerne les footings, la récupération et la sortie longue (un palier plus loin). La séance de qualité devient un « fartlek en douceur » (5 min de course facile, puis 4 à 6 × 1 min un peu plus vite avec marche). Durée de la séance : environ 8 min par km affiché, 5 min de marche avant et après. Ensuite, les footings se courent d'un seul tenant. Un débutant qui court déjà plus de 10 km par semaine n'a pas de course/marche.
+- Nouvelles données : `Seg.walk` (marche), `Workout.warm` et `Workout.cool` (échauffement et retour au calme chronométrés). Étape « Marcher » dans le déroulé. `targetsFor` ne compare pas l'allure moyenne d'une sortie en course/marche à la cible.
+- **Débutant** : les répétitions de qualité s'arrêtent au deuxième cran de la progression, pas d'alternance ni de blocs au seuil en sortie longue. **Avancé** : la progression démarre un cran plus loin (répétitions plus longues dès le début). Voir `levelCycle`.
+- **Avancé sur 4 jours** : deux séances de travail par semaine (qualité + tempo, créneau « footing » remplacé), le tempo pèse 20 % du volume (au lieu de 15 %) pour que le footing restant ne dépasse pas la sortie longue. Sur 5 et 6 jours, les intermédiaires et les avancés avaient déjà qualité + tempo.
+- La mise à jour d'un plan enregistré (`upgradePlan`) couvre aussi la course/marche des débutants.
+- Pistes restantes : séance de contrôle, jours de repos ou de renforcement, deuxième séance de qualité sur 5 et 6 jours pour les avancés.
