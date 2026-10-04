@@ -40,8 +40,8 @@ export default function Activities({ plan, done, activities, presetSessionId, on
   const [feeling, setFeeling] = useState<Activity["feeling"]>(undefined);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  /** Activité dont le détail est ouvert */
-  const [openId, setOpenId] = useState<string | undefined>();
+  /** Activités dont le détail est ouvert (plusieurs à la fois) */
+  const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
   /** Mois ouverts ou fermés par l'utilisateur ; sans choix, seul le mois le plus récent est ouvert */
   const [monthsOpen, setMonthsOpen] = useState<Record<string, boolean>>({});
 
@@ -104,6 +104,8 @@ export default function Activities({ plan, done, activities, presetSessionId, on
   }
 
   const groups = groupByMonth(activities);
+  const isMonthOpen = (month: string, i: number) => monthsOpen[month] ?? i === 0;
+  const allMonthsOpen = groups.every((g, i) => isMonthOpen(g.month, i));
 
   return (
     <div className="activities">
@@ -203,8 +205,13 @@ export default function Activities({ plan, done, activities, presetSessionId, on
         <p className="hint empty">Aucune activité pour l'instant. Enregistre ta première sortie pour alimenter tes statistiques.</p>
       ) : (
         <div className="months">
+          {groups.length > 1 && (
+            <button type="button" className="link months__all" onClick={() => setMonthsOpen(Object.fromEntries(groups.map((g) => [g.month, !allMonthsOpen])))}>
+              {allMonthsOpen ? "Tout replier" : "Tout déplier"}
+            </button>
+          )}
           {groups.map((g, i) => (
-            <details key={g.month} className="month" open={monthsOpen[g.month] ?? i === 0} onToggle={(e) => {
+            <details key={g.month} className="month" open={isMonthOpen(g.month, i)} onToggle={(e) => {
                 const isOpen = (e.currentTarget as HTMLDetailsElement).open;
                 setMonthsOpen((prev) => ({ ...prev, [g.month]: isOpen }));
               }}>
@@ -216,8 +223,8 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                 {g.activities.map((a) => {
             const s = a.sessionId ? byId.get(a.sessionId) : undefined;
             return (
-              <li key={a.id} className={`activity${openId === a.id ? " activity--open" : ""}`}>
-                <button type="button" className="activity__toggle" aria-expanded={openId === a.id} onClick={() => setOpenId(openId === a.id ? undefined : a.id)}>
+              <li key={a.id} className={`activity${openIds[a.id] ? " activity--open" : ""}`}>
+                <button type="button" className="activity__toggle" aria-expanded={!!openIds[a.id]} onClick={() => setOpenIds((prev) => ({ ...prev, [a.id]: !prev[a.id] }))}>
                   <span className="activity__head">
                     <span className="session__date">{fmtDate(a.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
                     <span className="activity__km">{fmtKm(a.km)} km</span>
@@ -233,7 +240,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                 </button>
                 {s && <PaceCheck plan={plan} model={paces} session={s} pace={paceOf(a)} />}
                 {a.note && <p className="hint">{a.note}</p>}
-                {openId === a.id && (
+                {openIds[a.id] && (
                   <>
                     <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} />
                     <div className="activity__actions">

@@ -16,4 +16,9 @@ Contrôlé à 1400 px avec les vraies données (six mois, du plus récent à avr
 
 ## Reste
 
-- Les mois pourraient avoir un bouton « tout déplier / tout replier » si la liste s'allonge.
+- (fait, voir le complément ci-dessous) Bouton « tout déplier / tout replier » pour les mois.
+
+## Complément : plusieurs cartes ouvertes, tout déplier / replier
+
+- Plusieurs sorties peuvent rester ouvertes en même temps (`openIds` à la place d'un seul `openId`).
+- Un bouton « Tout déplier » / « Tout replier » apparaît au-dessus des mois dès qu'il y en a au moins deux. Vérifié à l'écran avec des activités de test : trois mois dépliés, deux sorties ouvertes ensemble.
