@@ -29,6 +29,12 @@ export function fmtPace(minPerKm: number) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
+/** Allure cible : les secondes arrondies au multiple de 5 le plus proche (7:47 → « 7:45 »). */
+export function fmtTargetPace(minPerKm: number) {
+  const total = Math.round((minPerKm * 60) / 5) * 5;
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /** Temps de course : 24.75 → « 24:45 », 105.5 → « 1:45:30 ». */
 export function fmtClock(minutes: number) {
   const total = Math.round(minutes * 60);

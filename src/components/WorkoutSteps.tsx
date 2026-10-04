@@ -1,13 +1,13 @@
 import type { Plan, Session } from "../lib/plan";
 import type { PaceModel } from "../lib/paces";
 import { stepSize, workoutBlocks, type WorkoutStep } from "../lib/steps";
-import { fmtPace } from "../lib/format";
+import { fmtTargetPace } from "../lib/format";
 
 const KIND_LABEL: Record<WorkoutStep["kind"], string> = { easy: "Courir", work: "Courir", stride: "Courir", rest: "Récup." };
 
 function paceText(step: WorkoutStep): string | null {
   if (!step.pace) return null;
-  return step.paceMode === "plafond" ? `Pas plus vite que ${fmtPace(step.pace.fast)} /km` : `${fmtPace(step.pace.fast)}–${fmtPace(step.pace.slow)} /km`;
+  return step.paceMode === "plafond" ? `Pas plus vite que ${fmtTargetPace(step.pace.fast)} /km` : `${fmtTargetPace(step.pace.fast)}–${fmtTargetPace(step.pace.slow)} /km`;
 }
 
 /** Déroulé pas à pas d'une séance structurée, avec l'allure de chaque portion. Rien pour un footing simple. */

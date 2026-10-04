@@ -2,10 +2,10 @@ import { useState, type FormEvent } from "react";
 import type { Plan, Session } from "../lib/plan";
 import { parseMinutes } from "../lib/activities";
 import { RECENT_DAYS, MIN_RUNS, MIN_RUN_KM, ZONES, ZONE_ORDER, comparePace, isValidPace, targetsFor, zoneRange, type PaceModel, type PaceRange } from "../lib/paces";
-import { fmtKm, fmtPace } from "../lib/format";
+import { fmtKm, fmtPace, fmtTargetPace } from "../lib/format";
 
 /** « 5:25–5:35 » : l'allure la plus rapide d'abord. */
-export const fmtRange = (r: PaceRange) => `${fmtPace(r.fast)}–${fmtPace(r.slow)}`;
+export const fmtRange = (r: PaceRange) => `${fmtTargetPace(r.fast)}–${fmtTargetPace(r.slow)}`;
 
 const ZONE_HINT: Record<(typeof ZONE_ORDER)[number], string> = {
   recuperation: "Récupération, lendemain de séance dure",
