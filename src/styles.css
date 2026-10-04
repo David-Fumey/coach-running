@@ -3981,7 +3981,7 @@ body {
     grid-column: 1 / -1;
   }
 
-  /* Progrès : filtres, chiffres et records en pleine largeur, puis les deux graphiques côte à côte. */
+  /* Progrès : filtres, chiffres, records et graphiques en pleine largeur, l'un sous l'autre. */
   .progress-tab {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
@@ -3991,7 +3991,8 @@ body {
   .progress-tab > .filters,
   .progress-tab > .stats,
   .progress-tab > .records-card,
-  .progress-tab > .empty {
+  .progress-tab > .empty,
+  .progress-tab > .chart-card {
     grid-column: 1 / -1;
   }
 

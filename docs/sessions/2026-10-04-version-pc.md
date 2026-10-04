@@ -29,7 +29,7 @@ Contrôlé à 1400 et 1024 px, puis en mobile (375 px) pour s'assurer que rien n
 
 ## Complément : Progrès et Hydratation
 
-- **Progrès** : filtres sur une ligne (menu à gauche, rappel de la période à droite), chiffres par rangées de quatre, records en pleine largeur, puis les graphiques « Distance » et « Allure moyenne » côte à côte.
+- **Progrès** : filtres sur une ligne (menu à gauche, rappel de la période à droite), chiffres par rangées de quatre, records en pleine largeur, puis les graphiques « Distance » et « Allure moyenne » en pleine largeur, l’un sous l’autre, pour rester lisibles.
 - **Hydratation** : les cartes (suivi du jour, sept derniers jours, eau perdue, transpiration) se répartissent sur deux colonnes sans trou ; le rappel de profil et les conseils d'hydratation gardent la pleine largeur.
 - Contrôlé à 1400 px avec les vraies données. L'écran « Suivi » de Nutrition n'a pas pu être vu (pas de profil nutrition saisi) : il garde une seule colonne.
 - La page Profil et le Suivi nutrition restent sur une colonne : ce sont des formulaires et un journal où une colonne unique se lit bien.
