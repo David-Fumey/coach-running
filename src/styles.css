@@ -3981,6 +3981,47 @@ body {
     grid-column: 1 / -1;
   }
 
+  /* Progrès : filtres, chiffres et records en pleine largeur, puis les deux graphiques côte à côte. */
+  .progress-tab {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  .progress-tab > .filters,
+  .progress-tab > .stats,
+  .progress-tab > .records-card,
+  .progress-tab > .empty {
+    grid-column: 1 / -1;
+  }
+
+  .progress-tab > .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .progress-tab > .filters {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 1.25rem;
+  }
+
+  /* Hydratation : les cartes se répartissent sur deux colonnes sans trou ; les conseils et les rappels gardent la pleine largeur. */
+  .hydration {
+    display: block;
+    column-count: 2;
+    column-gap: 1.25rem;
+  }
+
+  .hydration > * {
+    break-inside: avoid;
+    margin-bottom: 1.25rem;
+  }
+
+  .hydration > :not(.card),
+  .hydration > .hydro-tips {
+    column-span: all;
+  }
+
   .activities > .btn--primary {
     justify-self: start;
   }
