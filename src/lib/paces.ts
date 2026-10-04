@@ -7,6 +7,7 @@
 // ses allures sous-estimées, un autre qui court toujours vite les verra surestimées.
 
 import type { Intensity, Plan, RaceKey, Session, Workout } from "./plan.ts";
+import { TEST_FRESH_DAYS, TEST_KM, type TestResult } from "./tests.ts";
 import { diffDays } from "./plan.ts";
 import type { Activity } from "./activities.ts";
 import { RACE_KM, goalPace, vdotFromRace, type Goal } from "./goal.ts";
@@ -88,7 +89,7 @@ const RACE_ZONE: Record<RaceKey, ZoneId> = { "5k": "5k", "10k": "10k", semi: "se
 // ---------- Référence : la moyenne des sorties ----------
 
 /** « objectif » : ni sorties ni saisie, le niveau vient du temps objectif de course. */
-export type ReferenceSource = "manuelle" | "recentes" | "dernieres" | "objectif";
+export type ReferenceSource = "manuelle" | "test" | "recentes" | "dernieres" | "objectif";
 
 export interface Reference {
   /** Allure moyenne d'entraînement, en min/km */
@@ -97,6 +98,8 @@ export interface Reference {
   /** Sorties retenues (0 si saisie à la main) */
   runs: number;
   km: number;
+  /** Test de 5 km qui sert de référence (source « test ») */
+  test?: TestResult;
 }
 
 export interface PaceModel {
@@ -158,11 +161,17 @@ const clampVdot = (v: number) => Math.min(VDOT_BOUNDS.max, Math.max(VDOT_BOUNDS.
  * Modèle d'allures : la saisie manuelle s'il y en a une, sinon la moyenne des sorties.
  * Sans l'un ni l'autre, le temps objectif de course sert de base ; sans rien, null.
  */
-export function paceModel(activities: Activity[], today: string, manual: number | null, goal: Goal | null = null): PaceModel | null {
-  const reference: Reference | null = isValidPace(manual)
-    ? { pace: manual, source: "manuelle", runs: 0, km: 0 }
-    : referenceFromActivities(activities, today);
+export function paceModel(activities: Activity[], today: string, manual: number | null, goal: Goal | null = null, test: TestResult | null = null): PaceModel | null {
+  const fromTest = (t: TestResult): PaceModel => {
+    const vdot = clampVdot(vdotFromRace(TEST_KM, t.minutes));
+    return { reference: { pace: paceAt(vdot, AVERAGE_FRACTION), source: "test", runs: 1, km: TEST_KM, test: t }, vdot, goal };
+  };
+  const fresh = test !== null && diffDays(test.date, today) <= TEST_FRESH_DAYS;
+  if (isValidPace(manual)) return { reference: { pace: manual, source: "manuelle", runs: 0, km: 0 }, vdot: vdotFromAveragePace(manual), goal };
+  if (test && fresh) return fromTest(test);
+  const reference = referenceFromActivities(activities, today);
   if (reference) return { reference, vdot: vdotFromAveragePace(reference.pace), goal };
+  if (test) return fromTest(test);
   if (!goal) return null;
   const vdot = clampVdot(vdotFromRace(RACE_KM[goal.race], goal.minutes));
   return { reference: { pace: paceAt(vdot, AVERAGE_FRACTION), source: "objectif", runs: 0, km: 0 }, vdot, goal };
@@ -236,6 +245,8 @@ export function intensityTarget(model: PaceModel, plan: Plan, session: Session, 
       return c.target(ZONES.marathon.label, "marathon", 0, v);
     case "course":
       return c.g ? c.goalTarget("Allure objectif") : c.target(ZONES[c.raceZone].label, c.raceZone);
+    case "test":
+      return null;
     case "coursePlus":
       return c.g ? c.goalTarget("Allure objectif ou un peu plus vite", 0.02) : c.target("Allure de course ou un peu plus vite", c.raceZone, 0.02);
   }
@@ -246,7 +257,7 @@ export function timedIntensities(w: Workout): Intensity[] {
   const out: Intensity[] = [];
   for (const set of w.sets) {
     const { intensity, hill } = set.work;
-    if (hill || intensity === "facile" || intensity === "soutenu" || out.includes(intensity)) continue;
+    if (hill || intensity === "facile" || intensity === "soutenu" || intensity === "test" || out.includes(intensity)) continue;
     out.push(intensity);
   }
   return out;

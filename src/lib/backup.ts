@@ -6,6 +6,7 @@ import type { Activity } from "./activities.ts";
 import { isValidPace } from "./paces.ts";
 import { validGoal, type Goal } from "./goal.ts";
 import { CONDITIONS, validAmount, validateWeighing, type Water, type Weighing } from "./hydration.ts";
+import { validTest, type TestResult } from "./tests.ts";
 import { GOALS, validateProfile, type Food, type Profile } from "./nutrition.ts";
 
 export interface Snapshot {
@@ -23,9 +24,11 @@ export interface Snapshot {
   water: Water[];
   /** Pesées avant / après une sortie, pour étalonner la transpiration */
   sweat: Weighing[];
+  /** Tests de 5 km chronométrés, qui recalent les allures cibles */
+  tests: TestResult[];
 }
 
-export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null, water: [], sweat: [] };
+export const EMPTY_SNAPSHOT: Snapshot = { plan: null, done: {}, activities: [], confirmed: false, profile: null, foods: [], paceRef: null, goal: null, water: [], sweat: [], tests: [] };
 
 /** Identifiant interne, resté « foulee » (ancien nom de l'application) pour que les anciennes sauvegardes restent lisibles. */
 const APP = "foulee";
@@ -137,6 +140,7 @@ export function parseBackup(text: string): ParseResult {
   const goal = d.goal ?? null;
   const water = d.water ?? [];
   const sweat = d.sweat ?? [];
+  const tests = d.tests ?? [];
 
   if (plan !== null && !validPlan(plan)) return { ok: false, error: "Le plan contenu dans le fichier est invalide." };
   if (!isObj(done) || !Object.values(done).every((v) => v === true)) return { ok: false, error: "Les séances validées du fichier sont invalides." };
@@ -147,6 +151,7 @@ export function parseBackup(text: string): ParseResult {
   if (paceRef !== null && !isValidPace(paceRef)) return { ok: false, error: "L'allure moyenne du fichier est invalide." };
   if (!Array.isArray(water) || !water.every(validWater)) return { ok: false, error: "Le suivi d'hydratation du fichier est invalide." };
   if (!Array.isArray(sweat) || !sweat.every(validWeighing)) return { ok: false, error: "Les pesées du fichier sont invalides." };
+  if (!Array.isArray(tests) || !tests.every(validTest)) return { ok: false, error: "Les tests de 5 km du fichier sont invalides." };
   if (goal !== null && !validGoal(goal)) return { ok: false, error: "Le temps objectif du fichier est invalide." };
 
   return {
@@ -161,6 +166,7 @@ export function parseBackup(text: string): ParseResult {
       goal: goal as Goal | null,
       water: water as Water[],
       sweat: sweat as Weighing[],
+      tests: tests as TestResult[],
       confirmed: plan === null ? false : confirmed,
     },
   };

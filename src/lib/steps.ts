@@ -47,6 +47,7 @@ const INTENSITY_LABEL: Record<Intensity, string> = {
   marathon: "Allure marathon",
   course: "Allure de course",
   coursePlus: "Allure de course ou plus vite",
+  test: "Test 5 km chronométré",
 };
 
 const INTENSITY_EFFORT: Partial<Record<Intensity, string>> = {
@@ -55,6 +56,7 @@ const INTENSITY_EFFORT: Partial<Record<Intensity, string>> = {
   "5k": "effort 9/10",
   "10k": "effort 8/10",
   seuil: "effort 7/10, quelques mots seulement",
+  test: "à fond mais régulier, effort 9/10",
 };
 
 /** Déroulé enregistré avec la séance, ou celui qu'avaient les séances de qualité et de tempo avant le catalogue. */

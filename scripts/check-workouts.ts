@@ -93,7 +93,7 @@ check("rappel d'allure à l'affûtage : court", qualityWorkout("semi", "affutage
 
 // ---------- Plans sans le catalogue (anciens plans enregistrés) ----------
 const old: Plan = JSON.parse(JSON.stringify(semi));
-for (const { s } of all(old)) delete s.workout;
+for (const { s } of all(old)) if (s.type !== "test") delete s.workout;
 const oldQuality = all(old).find(({ s, w }) => s.type === "quality" && w.phase === "base")!;
 const ob = workoutBlocks(old, oldQuality.s, model)!;
 check("ancien plan : le fartlek garde son déroulé", ob.length === 3 && ob[1].steps[0].seconds === 60 && ob[1].repeat >= 4, ob[1]);
@@ -144,17 +144,17 @@ const dq = hardQ("debutant"), iq = hardQ("intermediaire"), aq = hardQ("avance");
 check("avancé : répétitions plus longues qu'un intermédiaire, qu'un débutant", Math.max(...aq) > Math.max(...iq) && Math.max(...iq) >= Math.max(...dq) && aq[0] > iq[0], { dq, iq, aq });
 const adv4 = generatePlan(input("10k", "2027-02-14", { level: "avance", daysPerWeek: 4, currentWeeklyKm: 30 }));
 const mid4 = generatePlan(input("10k", "2027-02-14", { level: "intermediaire", daysPerWeek: 4, currentWeeklyKm: 30 }));
-const hardPerWeek = (p: Plan) => p.weeks.filter((w) => w.phase !== "course").map((w) => w.sessions.filter((s) => s.type === "quality" || s.type === "tempo").length);
+const hardPerWeek = (p: Plan) => p.weeks.filter((w) => w.phase !== "course").map((w) => w.sessions.filter((s) => s.type === "quality" || s.type === "tempo" || s.type === "test").length);
 check("avancé sur 4 jours : deux séances de travail par semaine, un intermédiaire une seule", hardPerWeek(adv4).slice(0, -1).every((n) => n === 2) && hardPerWeek(mid4).every((n) => n <= 1), [hardPerWeek(adv4), hardPerWeek(mid4)]);
 check("avancé sur 4 jours : aucune séance plus longue que la sortie longue", adv4.weeks.every((w) => w.sessions.every((s) => s.type === "long" || w.sessions.find((x) => x.type === "long") === undefined || s.km <= w.sessions.find((x) => x.type === "long")!.km + 0.5)));
 const walkPlanOld: Plan = JSON.parse(JSON.stringify(beginner));
-for (const { s } of all(walkPlanOld)) delete s.workout;
+for (const { s } of all(walkPlanOld)) if (s.type !== "test") delete s.workout;
 check("ancien plan de débutant : la mise à jour donne le plan neuf", isDeepStrictEqual(upgradePlan(walkPlanOld, {}, "2026-10-05"), beginner));
 check("ancien plan de débutant : les footings de course/marche sont à mettre à jour", upgradableCount(walkPlanOld, {}, "2026-10-05") > upgradableCount(beginner, {}, "2026-10-05") && upgradableCount(beginner, {}, "2026-10-05") === 0);
 
 // ---------- Mise à jour d'un plan enregistré ----------
 const oldMarathon: Plan = JSON.parse(JSON.stringify(marathon));
-for (const { s } of all(oldMarathon)) delete s.workout;
+for (const { s } of all(oldMarathon)) if (s.type !== "test") delete s.workout;
 const oldCount = all(oldMarathon).filter(({ s }) => s.type === "quality" || s.type === "tempo" || s.type === "long").length;
 check("ancien plan : séances de qualité, de tempo et sorties longues sont à mettre à jour", upgradableCount(oldMarathon, {}, "2026-10-05") === oldCount && oldCount > 10);
 check("plan à jour : rien à mettre à jour", upgradableCount(marathon, {}, "2026-10-05") === 0);

@@ -21,7 +21,8 @@
     "test:shift": "node --experimental-strip-types scripts/check-shift.ts",
     "test:hydration": "node --experimental-strip-types scripts/check-hydration.ts",
     "test:steps": "node --experimental-strip-types scripts/check-steps.ts",
-    "test:workouts": "node --experimental-strip-types scripts/check-workouts.ts"
+    "test:workouts": "node --experimental-strip-types scripts/check-workouts.ts",
+    "test:control": "node --experimental-strip-types scripts/check-control.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",

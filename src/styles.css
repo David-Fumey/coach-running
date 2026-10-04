@@ -1035,6 +1035,10 @@ button {
 .session--shakeout {
   --t: var(--t-recovery);
 }
+.session--test {
+  border-left-color: var(--t-race);
+}
+
 .session--race {
   --t: var(--t-race);
 }

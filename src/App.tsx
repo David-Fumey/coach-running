@@ -4,6 +4,8 @@ import { paceModel } from "./lib/paces";
 import type { Goal } from "./lib/goal";
 import { canUndoShift, shiftPlan } from "./lib/shift";
 import { upgradePlan } from "./lib/workouts";
+import { latestTest, withTest, type TestResult } from "./lib/tests";
+import TestCard from "./components/TestCard";
 import { DEFAULT_WEIGHT_KG, calibration, postRunLoss, type Water, type Weighing } from "./lib/hydration";
 import LossBanner from "./components/LossBanner";
 import type { View as NutritionView } from "./components/Nutrition";
@@ -34,6 +36,8 @@ export default function App() {
   const [foods, setFoods] = useStoredState<Food[]>("foulee.foods.v1", []);
   const [water, setWater] = useStoredState<Water[]>("foulee.water.v1", []);
   const [sweat, setSweat] = useStoredState<Weighing[]>("foulee.sweat.v1", []);
+  // Tests de 5 km chronométrés : ils recalent les allures cibles.
+  const [tests, setTests] = useStoredState<TestResult[]>("foulee.tests.v1", []);
   // Sorties dont le rappel d'hydratation a été fermé. Simple confort d'affichage : hors sauvegarde.
   const [lossSeen, setLossSeen] = useStoredState<string[]>("foulee.lossseen.v1", []);
   /** Volet de Nutrition à ouvrir (depuis le rappel d'hydratation) */
@@ -154,6 +158,7 @@ export default function App() {
     setFoods(d.foods);
     setWater(d.water);
     setSweat(d.sweat);
+    setTests(d.tests);
     setPaceRef(d.paceRef);
     setGoal(d.goal);
     setEditing(false);
@@ -205,7 +210,26 @@ export default function App() {
     ? postRunLoss(activities, sweat, lossSeen, todayISO(), profile?.weightKg ?? DEFAULT_WEIGHT_KG, calibration(sweat)?.factor ?? 1)
     : null;
   const planGoal = plan && goal && goal.race === plan.input.race ? goal : null;
-  const paces = paceModel(activities, todayISO(), paceRef, planGoal);
+  const paces = paceModel(activities, todayISO(), paceRef, planGoal, latestTest(tests));
+
+  function saveTest(r: { date: string; minutes: number; sessionId?: string }) {
+    const id = `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    setTests((prev) => withTest(prev, { id, ...r }));
+  }
+  const testCard = (summary: boolean) =>
+    plan ? (
+      <TestCard
+        plan={plan}
+        activities={activities}
+        tests={tests}
+        model={paces}
+        preview={(minutes) => paceModel(activities, todayISO(), paceRef, planGoal, { id: "apercu", date: todayISO(), minutes })}
+        manualPace={paceRef !== null}
+        onSave={saveTest}
+        onDelete={(id) => setTests((prev) => prev.filter((t) => t.id !== id))}
+        summary={summary}
+      />
+    ) : null;
 
   if (showProfile) {
     return (
@@ -221,7 +245,7 @@ export default function App() {
             activityCount={activities.length}
             foodCount={foods.length}
             onSaveProfile={setProfile}
-            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water, sweat }, new Date())}
+            getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water, sweat, tests }, new Date())}
             onImport={importData}
             strava={strava}
             onReset={() => {
@@ -291,6 +315,7 @@ export default function App() {
             onOpenProgram={() => goTo("programme")}
             onOpenProgress={() => goTo("progres")}
             paces={paces}
+            testCard={testCard(false)}
           />
         )}
         {tab === "programme" && (
@@ -300,6 +325,7 @@ export default function App() {
             onShift={shiftProgram}
             onUndoShift={undoShift}
             onUpgrade={upgradeSessions}
+            testCard={testCard(true)}
           />
         )}
         {tab === "activites" && (

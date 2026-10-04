@@ -308,6 +308,19 @@ export function legacyTempoWorkout(km: number): Workout {
   return continuousTempo(km).workout;
 }
 
+// ---------- Séance de contrôle ----------
+
+/** Distance totale de la séance de test : 2 km d'échauffement, 5 km chronométrés, 1 km de retour au calme. */
+export const TEST_SESSION_KM = 8;
+
+export function testWorkout(): Built {
+  return {
+    title: "Test 5 km chronométré",
+    details: `${WARM}5 km chronométrés : pars à l'allure que tu penses tenir jusqu'au bout, reste régulier et accélère sur le dernier kilomètre s'il te reste du jus${COOL} Note ton temps sur les 5 km : il recale tes allures cibles. Évite une grosse séance la veille.`,
+    workout: { format: "test-5k", warmKm: 2, coolKm: 1, sets: [{ times: 1, work: { meters: 5000, intensity: "test" } }] },
+  };
+}
+
 // ---------- Mise à jour d'un plan enregistré ----------
 
 const upgradable = (s: Session, done: Record<string, boolean>, today: string, walking = false) =>
@@ -319,17 +332,23 @@ const upgradable = (s: Session, done: Record<string, boolean>, today: string, wa
 /** Semaines d'entraînement du plan (hors affûtage et course) : elles fixent la durée du course/marche. */
 const trainingWeeksOf = (plan: Plan) => plan.weeks.filter((w) => w.phase !== "affutage" && w.phase !== "course").length;
 
-/** Nombre de séances à venir (qualité, tempo) qui n'ont pas encore le déroulé du catalogue. */
+/** Nombre de séances à venir qu'une mise à jour changerait (catalogue, course/marche, séances de test). */
 export function upgradableCount(plan: Plan, done: Record<string, boolean>, today: string): number {
-  const runWalk = needsRunWalk(plan.input);
-  const walkWeeks = runWalkWeeks(trainingWeeksOf(plan));
-  return plan.weeks.reduce((n, w) => n + w.sessions.filter((s) => upgradable(s, done, today, runWalk && w.index < walkWeeks)).length, 0);
+  const next = upgradePlan(plan, done, today);
+  let n = 0;
+  next.weeks.forEach((w, i) =>
+    w.sessions.forEach((s, j) => {
+      if (s !== plan.weeks[i].sessions[j]) n++;
+    })
+  );
+  return n;
 }
 
 /**
- * Remplace les séances de qualité et de tempo à venir par celles du catalogue, avec les mêmes dates et les mêmes
- * kilomètres. Les séances déjà faites ou passées, et toutes les autres, ne bougent pas. Le rang de rotation se compte
- * sur tout le plan (phase par phase), comme à la création.
+ * Remplace les séances à venir par celles du catalogue, avec les mêmes dates et les mêmes kilomètres. Les séances
+ * déjà faites ou passées ne bougent pas. Le rang de rotation se compte sur tout le plan (phase par phase), comme à la
+ * création. Les phases de construction et spécifique qui n'ont pas de test en reçoivent un, à la place d'une séance de
+ * qualité : le kilométrage de cette semaine-là change un peu.
  */
 export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: string): Plan {
   const rank = new Map<Phase, number>();
@@ -337,29 +356,39 @@ export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: st
   let tempoRank = 0;
   const level = plan.input.level;
   const runWalk = needsRunWalk(plan.input);
-  const walkWeeks = runWalkWeeks(trainingWeeksOf(plan));
+  const trainingWeeks = trainingWeeksOf(plan);
+  const walkWeeks = runWalkWeeks(trainingWeeks);
+  const testsEnabled = trainingWeeks >= 8;
+  const tested = new Set<Phase>(plan.weeks.filter((w) => w.sessions.some((s) => s.type === "test")).map((w) => w.phase));
   const weeks = plan.weeks.map((w) => {
     const walking = runWalk && w.index < walkWeeks;
     const stage = runWalkStage(w.index, walkWeeks);
+    const testTarget =
+      testsEnabled && (w.phase === "construction" || w.phase === "specifique") && !tested.has(w.phase) && !w.isRecovery && !walking
+        ? w.sessions.find((s) => s.type === "quality" && s.date >= today && !done[s.id])
+        : undefined;
+    if (testTarget) tested.add(w.phase);
     const phaseRank = rank.get(w.phase) ?? 0;
-    if (w.sessions.some((s) => s.type === "quality")) rank.set(w.phase, phaseRank + 1);
+    if (w.sessions.some((s) => s.type === "quality") && !testTarget) rank.set(w.phase, phaseRank + 1);
     const longN = longRank.get(w.phase) ?? 0;
     if (!w.isRecovery && w.sessions.some((s) => s.type === "long")) longRank.set(w.phase, longN + 1);
-    return {
-      ...w,
-      sessions: w.sessions.map((s) => {
-        let built: Built | null = null;
-        if (!upgradable(s, done, today, walking)) {
-          if (s.type === "tempo") tempoRank++;
-        } else if (s.type === "quality") built = walking ? fartlekWalk(s.km) : qualityWorkout(plan.input.race, w.phase, s.km, phaseRank, level);
-        else if (s.type === "long") built = walking ? runWalkWorkout(s.km, stage + 1, true) : longWorkout(plan.input.race, w.phase, s.km, w.isRecovery, longN, level);
-        else if (s.type === "tempo") {
-          built = tempoWorkout(s.km, tempoRank, level);
-          tempoRank++;
-        } else built = runWalkWorkout(s.km, stage, false);
-        return built ? { ...s, title: built.title, details: built.details, workout: built.workout } : s;
-      }),
-    };
+    const sessions = w.sessions.map((s) => {
+      if (s === testTarget) {
+        const t = testWorkout();
+        return { ...s, type: "test" as const, km: TEST_SESSION_KM, title: t.title, details: t.details, workout: t.workout };
+      }
+      let built: Built | null = null;
+      if (!upgradable(s, done, today, walking)) {
+        if (s.type === "tempo") tempoRank++;
+      } else if (s.type === "quality") built = walking ? fartlekWalk(s.km) : qualityWorkout(plan.input.race, w.phase, s.km, phaseRank, level);
+      else if (s.type === "long") built = walking ? runWalkWorkout(s.km, stage + 1, true) : longWorkout(plan.input.race, w.phase, s.km, w.isRecovery, longN, level);
+      else if (s.type === "tempo") {
+        built = tempoWorkout(s.km, tempoRank, level);
+        tempoRank++;
+      } else built = runWalkWorkout(s.km, stage, false);
+      return built ? { ...s, title: built.title, details: built.details, workout: built.workout } : s;
+    });
+    return testTarget ? { ...w, sessions, totalKm: r05(sessions.reduce((acc, x) => acc + x.km, 0)) } : { ...w, sessions };
   });
   return { ...plan, weeks };
 }

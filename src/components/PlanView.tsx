@@ -29,6 +29,8 @@ interface Props {
   onUndoShift: () => void;
   /** Passe les séances de qualité et de tempo à venir au catalogue de séances */
   onUpgrade: () => void;
+  /** Test de 5 km : temps à saisir, dernier résultat, prochain test */
+  testCard?: ReactNode;
 }
 
 /** Index de la semaine en cours (ou la plus proche si le plan n'a pas commencé ou est terminé). */
@@ -40,7 +42,7 @@ export function currentWeekIndex(plan: Plan, today: string) {
 }
 
 /** Onglet « Programme » : le plan complet, semaine par semaine. */
-export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal, canUndoShift, onShift, onUndoShift, onUpgrade }: Props) {
+export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef, onChangePaceRef, goal, onChangeGoal, canUndoShift, onShift, onUndoShift, onUpgrade, testCard }: Props) {
   const today = todayISO();
   const upgradable = upgradableCount(plan, done, today);
   const currentIndex = currentWeekIndex(plan, today);
@@ -59,7 +61,7 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
         <section className="card upgrade-card" aria-labelledby="upgrade-title">
           <h2 id="upgrade-title" className="card__title">Nouvelles séances disponibles</h2>
           <p className="hint">
-            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sorties longues variées, avec l'allure de chaque portion. Les dates, les kilomètres et les séances déjà faites ne changent pas.
+            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sorties longues variées et tests de 5 km, avec l'allure de chaque portion. Les dates et les séances déjà faites ne changent pas ; les kilomètres non plus, sauf la semaine d'un test.
           </p>
           <div className="actions">
             <button type="button" className="btn btn--primary" onClick={onUpgrade}>
@@ -72,6 +74,8 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
       <VolumeChart weeks={plan.weeks} currentIndex={currentIndex} doneIds={done} />
 
       <GoalCard key={goal ? goal.minutes : "aucun"} race={plan.input.race} goal={goal} model={paces} onChange={onChangeGoal} />
+
+      {testCard}
 
       <PaceCard model={paces} manual={paceRef} onChangeManual={onChangePaceRef} />
 

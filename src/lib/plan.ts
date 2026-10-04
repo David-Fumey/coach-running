@@ -1,6 +1,6 @@
 // Moteur de génération de plan d'entraînement. Aucune dépendance : pur TypeScript.
 
-import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout } from "./workouts.ts";
+import { fartlekWalk, longWorkout, needsRunWalk, qualityWorkout, runWalkStage, runWalkWeeks, runWalkWorkout, tempoWorkout, TEST_SESSION_KM, testWorkout } from "./workouts.ts";
 
 export type RaceKey = "5k" | "10k" | "semi" | "marathon";
 export type Level = "debutant" | "intermediaire" | "avance";
@@ -13,6 +13,7 @@ export type SessionType =
   | "long"
   | "recovery"
   | "shakeout"
+  | "test"
   | "race";
 
 export interface PlanInput {
@@ -29,7 +30,7 @@ export interface PlanInput {
 }
 
 /** Intensité d'un effort structuré ; les allures correspondantes viennent de paces.ts. */
-export type Intensity = "facile" | "soutenu" | "5k" | "10k" | "seuil" | "semi" | "marathon" | "course" | "coursePlus";
+export type Intensity = "facile" | "soutenu" | "5k" | "10k" | "seuil" | "semi" | "marathon" | "course" | "coursePlus" | "test";
 
 /** Un effort : une distance ou une durée, à une intensité (en côte si `hill`). */
 export interface Seg {
@@ -278,6 +279,9 @@ export function generatePlan(input: PlanInput): Plan {
   // Débutant qui court peu : les premières semaines alternent course et marche, de plus en plus de course.
   const runWalk = needsRunWalk(input);
   const walkWeeks = runWalkWeeks(trainingWeeks);
+  // Un test de 5 km au début de la construction et de la phase spécifique (si la préparation dure au moins 8 semaines).
+  const testsEnabled = trainingWeeks >= 8;
+  const testedPhases = new Set<Phase>();
 
   for (let w = 0; w < totalWeeks; w++) {
     const weekStart = addDays(start, w * 7);
@@ -307,6 +311,7 @@ export function generatePlan(input: PlanInput): Plan {
     }
 
     const sessions: Session[] = [];
+    let testHere = false;
 
     if (isRaceWeek) {
       const shake = race === "marathon" || race === "semi" ? 5 : 4;
@@ -357,10 +362,13 @@ export function generatePlan(input: PlanInput): Plan {
       let firstEasy = true;
       const walking = runWalk && w < walkWeeks;
       const stage = runWalkStage(w, walkWeeks);
+      testHere = testsEnabled && (phase === "construction" || phase === "specifique") && !testedPhases.has(phase) && !isRecovery && !walking;
+      if (testHere) testedPhases.add(phase);
       const phaseRank = qualityRank.get(phase) ?? 0;
       slots.forEach((type, i) => {
         const date = addDays(weekStart, days[i]);
         let km: number;
+        let isTest = false;
         let content: { title: string; details: string; workout?: Workout };
         switch (type) {
           case "long":
@@ -369,7 +377,11 @@ export function generatePlan(input: PlanInput): Plan {
             break;
           case "quality":
             km = qualityKm;
-            content = walking ? fartlekWalk(round05(km)) : qualityWorkout(race, phase, round05(km), phaseRank, level);
+            if (testHere) {
+              km = TEST_SESSION_KM;
+              isTest = true;
+              content = testWorkout();
+            } else content = walking ? fartlekWalk(round05(km)) : qualityWorkout(race, phase, round05(km), phaseRank, level);
             break;
           case "tempo":
             km = tempoKm;
@@ -390,12 +402,12 @@ export function generatePlan(input: PlanInput): Plan {
             content = walking ? runWalkWorkout(round05(km), stage, false) : easySession(firstEasy && level !== "debutant" && phase !== "base");
             firstEasy = false;
         }
-        sessions.push({ id: `s-${date}`, date, type, km: round05(km), ...content });
+        sessions.push({ id: `s-${date}`, date, type: isTest ? "test" : type, km: round05(km), ...content });
       });
     }
 
     if (!isRaceWeek && !isRecovery) longRank.set(phase, (longRank.get(phase) ?? 0) + 1);
-    if (slots.includes("quality") && !isRaceWeek) qualityRank.set(phase, (qualityRank.get(phase) ?? 0) + 1);
+    if (slots.includes("quality") && !isRaceWeek && !testHere) qualityRank.set(phase, (qualityRank.get(phase) ?? 0) + 1);
 
     // Les séances déjà passées (début de plan en cours de semaine) sont ignorées.
     const kept = sessions.filter((s) => diffDays(today, s.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));

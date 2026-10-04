@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { Plan, Session } from "../lib/plan";
 import { parseMinutes } from "../lib/activities";
 import { RECENT_DAYS, MIN_RUNS, MIN_RUN_KM, ZONES, ZONE_ORDER, comparePace, isValidPace, targetsFor, zoneRange, type PaceModel, type PaceRange } from "../lib/paces";
-import { fmtKm, fmtPace, fmtTargetPace } from "../lib/format";
+import { fmtClock, fmtDate, fmtKm, fmtPace, fmtTargetPace } from "../lib/format";
 
 /** « 5:25–5:35 » : l'allure la plus rapide d'abord. */
 export const fmtRange = (r: PaceRange) => `${fmtTargetPace(r.fast)}–${fmtTargetPace(r.slow)}`;
@@ -70,6 +70,11 @@ export default function PaceCard({ model, manual, onChangeManual }: Props) {
         {ref ? (
           <p className="hint">
             {ref.source === "objectif" && <>Calculées à partir de ton temps objectif, faute de sorties enregistrées. Dès que tu auras couru, elles s'appuieront sur tes sorties.</>}
+            {ref.source === "test" && ref.test && (
+              <>
+                Calculées à partir de ton test de 5 km du {fmtDate(ref.test.date, { day: "numeric", month: "long" })} : {fmtClock(ref.test.minutes)}. Un test donne une base plus précise que la moyenne de tes sorties.
+              </>
+            )}
             {ref.source === "manuelle" && <>Calculées à partir de l'allure moyenne que tu as saisie : {fmtPace(ref.pace)} /km.</>}
             {ref.source === "recentes" && (
               <>

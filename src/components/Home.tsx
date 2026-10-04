@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { addDays, diffDays, type Plan, type Session } from "../lib/plan";
 import { summarize, type Activity } from "../lib/activities";
 import { fmtDate, fmtDuration, fmtKm } from "../lib/format";
@@ -17,6 +18,8 @@ interface Props {
   onOpenProgram: () => void;
   onOpenProgress: () => void;
   paces: PaceModel | null;
+  /** Invitation à renseigner le temps d'un test de 5 km, s'il y en a un à saisir */
+  testCard?: ReactNode;
 }
 
 const TYPE_LABEL: Record<Session["type"], string> = {
@@ -26,13 +29,14 @@ const TYPE_LABEL: Record<Session["type"], string> = {
   long: "Sortie longue",
   recovery: "Récupération",
   shakeout: "Veille de course",
+  test: "Test",
   race: "Course",
 };
 
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 /** Accueil du hub : la prochaine séance, la semaine en cours et quelques chiffres. */
-export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, paces }: Props) {
+export default function Home({ plan, done, activities, onLog, onOpenProgram, onOpenProgress, paces, testCard }: Props) {
   const today = todayISO();
   const week = plan.weeks[currentWeekIndex(plan, today)];
   const allSessions = plan.weeks.flatMap((w) => w.sessions);
@@ -46,6 +50,8 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
   return (
     <div className="home">
       <PlanHero input={plan.input} goal={paces?.goal ?? null} />
+
+      {testCard}
 
       <section className={`card next${next ? ` next--${next.type}` : ""}`} aria-labelledby="next-title">
         <p className="eyebrow">

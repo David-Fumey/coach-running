@@ -25,6 +25,7 @@ const full: Snapshot = {
   paceRef: 6.25,
   goal: { race: "10k", minutes: 47.5 },
   water: [{ id: "w1", date: "2026-10-05", ml: 250 }, { id: "w2", date: "2026-10-05", ml: 500 }],
+  tests: [{ id: "t1", date: "2026-10-05", minutes: 24.5, sessionId: "s-2026-10-05" }],
   sweat: [{ id: "p1", date: "2026-10-05", km: 10, minutes: 60, before: 70, after: 69.3, drankMl: 200, conditions: "temperee" }],
 };
 const text = makeBackup(full, new Date("2026-10-05T10:00:00Z"));

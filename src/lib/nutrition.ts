@@ -96,6 +96,7 @@ export function kindOf(type: Session["type"] | undefined, km: number): DayKind {
       return "long";
     case "quality":
     case "tempo":
+    case "test":
       return "intense";
     case undefined:
       return km > 0 ? "facile" : "repos";
