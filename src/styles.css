@@ -4043,6 +4043,18 @@ body {
     grid-column: 1 / -1;
   }
 
+  /* Suivi de nutrition : objectifs du jour à gauche, journal à droite ; la semaine et le pied de page gardent la pleine largeur. */
+  .nutrition {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  .nutrition > .weekstrip,
+  .nutrition > .nutrition__footer {
+    grid-column: 1 / -1;
+  }
+
   /* Les menus à choix gardent une largeur raisonnable. */
   .segmented {
     max-width: 30rem;
