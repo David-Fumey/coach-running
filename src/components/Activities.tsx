@@ -6,6 +6,7 @@ import { todayISO } from "../storage";
 import type { StravaApi } from "../useStrava";
 import { fmtSync } from "./StravaCard";
 import { PaceCheck } from "./PaceCard";
+import ActivityDetail from "./ActivityDetail";
 import type { PaceModel } from "../lib/paces";
 
 interface Props {
@@ -39,6 +40,8 @@ export default function Activities({ plan, done, activities, presetSessionId, on
   const [feeling, setFeeling] = useState<Activity["feeling"]>(undefined);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  /** Activité dont le détail est ouvert */
+  const [openId, setOpenId] = useState<string | undefined>();
 
   // Séances proposables : pas encore faites et au plus tard aujourd'hui, plus la séance déjà liée ou présélectionnée.
   const open = sessions.filter((s) => (!done[s.id] && diffDays(s.date, today) >= 0) || s.id === presetSessionId || s.id === sessionId);
@@ -215,6 +218,10 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                 </p>
                 {s && <PaceCheck plan={plan} model={paces} session={s} pace={paceOf(a)} />}
                 {a.note && <p className="hint">{a.note}</p>}
+                {openId === a.id && <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} />}
+                <button type="button" className="link" aria-expanded={openId === a.id} onClick={() => setOpenId(openId === a.id ? undefined : a.id)}>
+                  {openId === a.id ? "Masquer le détail" : "Voir le détail"}
+                </button>{" "}
                 <button type="button" className="link" onClick={() => startEdit(a)}>
                   Modifier
                 </button>{" "}

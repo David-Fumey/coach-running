@@ -2,7 +2,7 @@
 // voir `stravaClient.ts` pour le réseau. La réponse de Strava n'est jamais crue sur parole.
 
 import { type Plan } from "./plan.ts";
-import { addActivity, type Activity, type Efforts, type EffortKey, type Tracked } from "./activities.ts";
+import { addActivity, type Activity, type Efforts, type EffortKey, type RunDetail, type Split, type Tracked } from "./activities.ts";
 
 export interface StravaTokens {
   accessToken: string;
@@ -281,6 +281,36 @@ export function parseTemp(raw: unknown): number | null {
   return typeof t === "number" && Number.isFinite(t) && t >= -60 && t <= 60 ? t : null;
 }
 
+const inRange = (x: unknown, lo: number, hi: number): x is number => typeof x === "number" && Number.isFinite(x) && x >= lo && x <= hi;
+
+/**
+ * Détail d'une activité Strava : temps par kilomètre, cadence, calories, durée totale, appareil.
+ * Toujours un objet pour une réponse lisible (même sans kilomètres, par exemple sur tapis) : l'activité est alors
+ * marquée « lue » et n'est plus redemandée. null seulement si la réponse n'est pas un objet.
+ */
+export function parseRunDetail(raw: unknown): RunDetail | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const splits: Split[] = [];
+  if (Array.isArray(r.splits_metric)) {
+    for (const s of r.splits_metric as Record<string, unknown>[]) {
+      if (!s || !inRange(s.distance, 50, 2000) || !inRange(s.moving_time, 1, 6 * 3600)) continue;
+      const split: Split = { km: round2(s.distance / 1000), seconds: Math.round(s.moving_time) };
+      const hr = heartRate(s.average_heartrate);
+      if (hr !== undefined) split.hr = hr;
+      if (inRange(s.elevation_difference, -500, 500)) split.elev = Math.round(s.elevation_difference);
+      splits.push(split);
+    }
+  }
+  const out: RunDetail = { splits };
+  // Strava donne la cadence d'un seul pied : le nombre de pas par minute est le double.
+  if (inRange(r.average_cadence, 30, 125)) out.cadence = Math.round(r.average_cadence * 2);
+  if (inRange(r.calories, 1, 20000)) out.calories = Math.round(r.calories);
+  if (inRange(r.elapsed_time, 1, 48 * 3600)) out.elapsedMinutes = round2(r.elapsed_time / 60);
+  if (typeof r.device_name === "string" && r.device_name.trim() !== "") out.device = r.device_name.trim().slice(0, 60);
+  return out;
+}
+
 /** Nombre de sorties récentes dont on lit le détail pour en connaître la température. */
 export const RECENT_TEMP_COUNT = 8;
 
@@ -303,6 +333,8 @@ export function detailTargets(activities: Activity[], perDistance = EFFORT_CANDI
 export interface DetailsRead {
   efforts: Map<string, Efforts>;
   temps: Map<string, number | null>;
+  /** Temps par kilomètre, cadence, calories (absent : non lus) */
+  details?: Map<string, RunDetail>;
 }
 
 /** Enregistre ce que le détail a appris (efforts, température) sans jamais écraser une valeur déjà connue. */
@@ -311,8 +343,9 @@ export function applyDetails(activities: Activity[], read: DetailsRead): Activit
     if (!a.externalId) return a;
     const efforts = a.efforts === undefined ? read.efforts.get(a.externalId) : undefined;
     const temp = a.temp === undefined && read.temps.has(a.externalId) ? read.temps.get(a.externalId) : undefined;
-    if (efforts === undefined && temp === undefined) return a;
-    return { ...a, ...(efforts !== undefined ? { efforts } : {}), ...(temp !== undefined ? { temp } : {}) };
+    const detail = a.detail === undefined ? read.details?.get(a.externalId) : undefined;
+    if (efforts === undefined && temp === undefined && detail === undefined) return a;
+    return { ...a, ...(efforts !== undefined ? { efforts } : {}), ...(temp !== undefined ? { temp } : {}), ...(detail !== undefined ? { detail } : {}) };
   });
 }
 

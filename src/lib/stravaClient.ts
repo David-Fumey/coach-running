@@ -1,8 +1,8 @@
 // Appels réseau vers Strava. Le CORS de Strava est ouvert : tout se fait depuis le navigateur, sans serveur.
 // `fetch` est injectable pour pouvoir tester sans réseau.
 
-import { parseBestEfforts, parseTemp, tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
-import type { Efforts } from "./activities.ts";
+import { parseBestEfforts, parseRunDetail, parseTemp, tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
+import type { Efforts, RunDetail } from "./activities.ts";
 
 export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   ok: boolean;
@@ -111,6 +111,8 @@ export interface EffortsResult {
   efforts: Map<number, Efforts>;
   /** Température moyenne par identifiant Strava (null = pas de capteur ou activité introuvable) */
   temps: Map<number, number | null>;
+  /** Temps par kilomètre, cadence, calories par identifiant Strava */
+  details: Map<number, RunDetail>;
   /** Raison de l'arrêt avant la fin (quota, réseau, accès refusé), sinon null */
   stopped: StravaError | null;
 }
@@ -128,23 +130,27 @@ export async function fetchEfforts(
 ): Promise<EffortsResult> {
   const efforts = new Map<number, Efforts>();
   const temps = new Map<number, number | null>();
+  const details = new Map<number, RunDetail>();
   for (const id of ids) {
     try {
       const body = await call(fetchFn, `${ACTIVITY_URL}/${id}?include_all_efforts=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
       efforts.set(id, parseBestEfforts(body));
       temps.set(id, parseTemp(body));
+      const detail = parseRunDetail(body);
+      if (detail) details.set(id, detail);
     } catch (e) {
       if (e instanceof StravaError && e.kind === "reponse") {
         // 404 : activité supprimée, on n'y reviendra pas. Autre erreur : on réessaiera à la prochaine synchro.
         if (e.status === 404) {
           efforts.set(id, {});
           temps.set(id, null);
+          details.set(id, { splits: [] });
         }
         continue;
       }
-      return { efforts, temps, stopped: e instanceof StravaError ? e : new StravaError("reseau", "Strava est injoignable. Vérifie ta connexion et réessaie.") };
+      return { efforts, temps, details, stopped: e instanceof StravaError ? e : new StravaError("reseau", "Strava est injoignable. Vérifie ta connexion et réessaie.") };
     }
     onProgress?.(efforts.size, ids.length);
   }
-  return { efforts, temps, stopped: null };
+  return { efforts, temps, details, stopped: null };
 }

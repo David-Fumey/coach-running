@@ -70,6 +70,16 @@ function validEfforts(e: unknown): boolean {
   return isObj(e) && Object.entries(e).every(([k, v]) => EFFORT_KEYS.includes(k) && isNum(v) && v > 0);
 }
 
+function validDetail(d: unknown): boolean {
+  return (
+    isObj(d) &&
+    Array.isArray(d.splits) &&
+    d.splits.every((s) => isObj(s) && isNum(s.km) && s.km > 0 && isNum(s.seconds) && s.seconds > 0 && isOptNum(s.hr) && (s.elev === undefined || isNum(s.elev))) &&
+    isOptNum(d.calories) && isOptNum(d.cadence) && isOptNum(d.elapsedMinutes) &&
+    (d.device === undefined || typeof d.device === "string")
+  );
+}
+
 function validActivity(a: unknown): a is Activity {
   return (
     isObj(a) &&
@@ -84,6 +94,7 @@ function validActivity(a: unknown): a is Activity {
     (a.externalId === undefined || typeof a.externalId === "string") &&
     isOptNum(a.avgHr) && isOptNum(a.maxHr) && isOptNum(a.elevation) &&
     (a.efforts === undefined || validEfforts(a.efforts)) &&
+    (a.detail === undefined || validDetail(a.detail)) &&
     (a.temp === undefined || a.temp === null || (isNum(a.temp) && a.temp >= -60 && a.temp <= 60))
   );
 }

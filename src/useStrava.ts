@@ -13,9 +13,10 @@ import {
   parseCallback,
   stravaNumericId,
   syncAfter,
+  tokensExpired,
   type StravaState,
 } from "./lib/strava";
-import { StravaError, exchangeCode, fetchEfforts, fetchRuns, type FetchLike } from "./lib/stravaClient";
+import { StravaError, exchangeCode, fetchEfforts, fetchRuns, refreshTokens, type FetchLike } from "./lib/stravaClient";
 import { useStoredState } from "./storage";
 
 export type StravaStatus =
@@ -35,6 +36,8 @@ export interface StravaApi {
   sync: () => void;
   /** Relit tout l'historique du compte Strava (les courses déjà connues sont ignorées) */
   syncAll: () => void;
+  /** Lit le détail d'une sortie importée (temps par km, cadence, calories). Retourne un message d'erreur, ou null si tout va bien. */
+  loadDetail: (activityId: string) => Promise<string | null>;
   /** À appeler quand les activités sont remplacées (nouveau plan, import) : tout redevient importable */
   forgetHistory: () => void;
   /** Efface tout, y compris l'historique d'import */
@@ -118,7 +121,8 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
           // Le rendu de la fusion peut ne pas avoir eu lieu : on ne part des activités courantes que si elles la contiennent.
           const live = latest.current.activities;
           const base = merged.state.activities.every((a) => live.some((x) => x.id === a.id)) ? live : merged.state.activities;
-          activitiesNow = applyDetails(base, { efforts, temps });
+          const details = new Map([...res.details].map(([id, d]) => [`strava:${id}`, d]));
+          activitiesNow = applyDetails(base, { efforts, temps, details });
           setActivities(activitiesNow);
         }
         const remaining = detailTargets(activitiesNow, EFFORT_CANDIDATES_PER_DISTANCE, Infinity).length;
@@ -176,6 +180,35 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [plan, confirmed, state.tokens, sync]);
 
+  /** Lecture à la demande du détail d'une sortie (une requête), quand la synchro ne l'a pas encore lu. */
+  async function loadDetail(activityId: string): Promise<string | null> {
+    const { state: s, activities: list } = latest.current;
+    const act = list.find((a) => a.id === activityId);
+    const id = act ? stravaNumericId(act) : null;
+    if (!act || id === null) return "Cette sortie ne vient pas de Strava.";
+    if (!s.tokens) return "Connecte Strava (page Profil) pour lire le détail de cette sortie.";
+    try {
+      let tokens = s.tokens;
+      if (tokensExpired(tokens, Math.floor(Date.now() / 1000))) {
+        tokens = await refreshTokens(s, tokens, browserFetch);
+        setState((prev) => ({ ...prev, tokens }));
+      }
+      const res = await fetchEfforts(tokens.accessToken, [id], browserFetch);
+      if (res.stopped) return res.stopped.message;
+      if (res.details.size === 0) return "Strava n'a pas pu fournir le détail de cette sortie. Réessaie plus tard.";
+      setActivities(
+        applyDetails(latest.current.activities, {
+          efforts: new Map([...res.efforts].map(([n, e]) => [`strava:${n}`, e])),
+          temps: new Map([...res.temps].map(([n, t]) => [`strava:${n}`, t])),
+          details: new Map([...res.details].map(([n, d]) => [`strava:${n}`, d])),
+        })
+      );
+      return null;
+    } catch (e) {
+      return e instanceof StravaError ? e.message : "La lecture du détail a échoué.";
+    }
+  }
+
   function connect(clientId: string, clientSecret: string) {
     const id = clientId.trim();
     const secret = clientSecret.trim();
@@ -202,6 +235,7 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
     },
     sync: () => void sync(),
     syncAll: () => void sync(true),
+    loadDetail,
     forgetHistory: () => setState((prev) => ({ ...prev, seen: [], lastSync: null })),
     reset: () => {
       setState(EMPTY_STRAVA);

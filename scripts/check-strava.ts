@@ -2,7 +2,7 @@ import { generatePlan } from "../src/lib/plan.ts";
 import { addActivity, removeActivity, type Activity, type Tracked } from "../src/lib/activities.ts";
 import { makeBackup, parseBackup, EMPTY_SNAPSHOT } from "../src/lib/backup.ts";
 import {
-  EMPTY_STRAVA, RECENT_TEMP_COUNT, applyDetails, applyEfforts, detailTargets, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
+  EMPTY_STRAVA, RECENT_TEMP_COUNT, applyDetails, applyEfforts, detailTargets, parseRunDetail, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
   type StravaRun, type StravaTokens,
 } from "../src/lib/strava.ts";
 import { StravaError, fetchEfforts, fetchRuns, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
@@ -164,6 +164,44 @@ check("détails enregistrés sur l'activité lue", filled[0].temp === 22 && fill
 check("une température connue n'est jamais écrasée", filled[1].temp === 15 && filled[1].efforts!["5k"] === 23);
 check("des efforts connus non plus, et « pas de capteur » est mémorisé", filled[2].efforts!["5k"] === 25 && filled[2].temp === null);
 check("activité non lue : inchangée", applyDetails(base, { efforts: new Map(), temps: new Map() }).every((a, i) => a === base[i]));
+
+// ---------- Détail d'une sortie (temps par km, cadence, calories) ----------
+{
+  const raw = {
+    splits_metric: [
+      { distance: 1000.2, moving_time: 330, average_heartrate: 148.4, elevation_difference: 3.2 },
+      { distance: 1000, moving_time: 322, average_heartrate: 155, elevation_difference: -4.6 },
+      { distance: 520, moving_time: 170 },
+      { distance: 0, moving_time: 50 },
+      { distance: 1000, moving_time: "x" },
+    ],
+    average_cadence: 86.4, calories: 612.7, elapsed_time: 2400, device_name: " Garmin Forerunner 265 ",
+  };
+  const d = parseRunDetail(raw)!;
+  check("détail : kilomètres lus, valeurs invalides écartées", d.splits.length === 3 && d.splits[0].km === 1 && d.splits[0].seconds === 330 && d.splits[2].km === 0.52, d.splits);
+  check("détail : FC et dénivelé par kilomètre (négatif conservé)", d.splits[0].hr === 148 && d.splits[1].elev === -5 && d.splits[2].hr === undefined && d.splits[2].elev === undefined, d.splits);
+  check("détail : cadence doublée (un pied), calories, durée totale, appareil", d.cadence === 173 && d.calories === 613 && d.elapsedMinutes === 40 && d.device === "Garmin Forerunner 265", d);
+  const bare = parseRunDetail({})!;
+  check("détail sans kilomètres : objet vide mais lu", bare.splits.length === 0 && bare.cadence === undefined && bare.calories === undefined && bare.device === undefined, bare);
+  check("réponse illisible : null", parseRunDetail(null) === null && parseRunDetail("x") === null);
+  check("cadence ou calories aberrantes ignorées", parseRunDetail({ average_cadence: 400 })!.cadence === undefined && parseRunDetail({ calories: -3 })!.calories === undefined);
+
+  const res = await fetchEfforts("tok", [1, 2], async (u) => (u.includes("/activities/1?") ? respE(200, { ...detail, ...raw }) : respE(404, {})));
+  check("client : détail rangé par identifiant, 404 marqué lu", res.details.get(1)!.splits.length === 3 && res.details.get(2)!.splits.length === 0);
+
+  const base2 = [dAct(1), dAct(2, { detail: { splits: [], calories: 5 } })];
+  const filled2 = applyDetails(base2, { efforts: new Map(), temps: new Map(), details: new Map([["strava:1", d], ["strava:2", d]]) });
+  check("détail enregistré sur l'activité lue", filled2[0].detail?.splits.length === 3);
+  check("un détail déjà lu n'est jamais écrasé", filled2[1].detail?.calories === 5 && filled2[1].detail.splits.length === 0);
+  check("sans détail lu : activité inchangée", applyDetails(base2, { efforts: new Map(), temps: new Map() }).every((x, i) => x === base2[i]));
+
+  const snapText = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ ...dAct(1), detail: d }], done: {}, confirmed: true }, new Date("2026-10-04T10:00:00Z"));
+  const back2 = parseBackup(snapText);
+  check("sauvegarde : le détail survit à l'aller-retour", back2.ok && back2.data.activities[0].detail?.splits[1].elev === -5, back2);
+  const broken = JSON.parse(snapText);
+  broken.data.activities[0].detail.splits[0].seconds = -1;
+  check("sauvegarde : détail invalide refusé", !parseBackup(JSON.stringify(broken)).ok);
+}
 
 // ---------- Fusion ----------
 const m1 = mergeStrava(plan, empty, [], [run(100, s1.date, s1.km, 40)]);

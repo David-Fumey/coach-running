@@ -7,6 +7,30 @@ export type EffortKey = "5k" | "10k" | "semi" | "marathon";
 /** Meilleur temps (en minutes) sur chaque distance, à l'intérieur de la sortie. Objet vide : détail lu, aucun effort. */
 export type Efforts = Partial<Record<EffortKey, number>>;
 
+/** Un kilomètre de la sortie (le dernier peut être partiel). */
+export interface Split {
+  /** Distance du tronçon, en km */
+  km: number;
+  /** Temps en mouvement, en secondes */
+  seconds: number;
+  /** Fréquence cardiaque moyenne du tronçon */
+  hr?: number;
+  /** Dénivelé du tronçon en mètres (négatif en descente) */
+  elev?: number;
+}
+
+/** Détail d'une sortie importée, lu une fois dans l'activité Strava. `splits` vide : détail lu, rien de plus. */
+export interface RunDetail {
+  splits: Split[];
+  calories?: number;
+  /** Cadence moyenne, en pas par minute */
+  cadence?: number;
+  /** Durée totale arrêts compris, en minutes */
+  elapsedMinutes?: number;
+  /** Montre ou appareil d'enregistrement */
+  device?: string;
+}
+
 export interface Activity {
   id: string;
   /** AAAA-MM-JJ */
@@ -31,6 +55,8 @@ export interface Activity {
   efforts?: Efforts;
   /** Température moyenne relevée par la montre, en °C (importée) ; null = détail lu, pas de capteur ; absent = pas encore lu */
   temp?: number | null;
+  /** Temps par kilomètre, cadence, calories… (importés ; absent tant que le détail n'a pas été lu) */
+  detail?: RunDetail;
 }
 
 export const FEELINGS: Record<number, string> = {

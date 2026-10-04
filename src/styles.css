@@ -3428,3 +3428,20 @@ button {
 .week__load--soutenue {
   color: var(--t-long);
 }
+
+/* Détail d'une sortie */
+.ad { margin: 0.75rem 0; }
+.ad__stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.5rem; margin: 0; }
+.ad__stat { padding: 0.5rem 0.65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.ad__stat dt { font-size: 0.78rem; color: var(--muted); }
+.ad__stat dd { margin: 0; font-weight: 700; font-size: 1.05rem; }
+.ad__title { margin: 1rem 0 0.4rem; font-size: 1rem; }
+.ad__splits { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.ad__split { display: grid; grid-template-columns: 2.6rem 1fr 3.2rem 4.4rem 3.4rem; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.ad__km { color: var(--muted); }
+.ad__bar { display: block; height: 0.7rem; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.ad__bar span { display: block; height: 100%; background: var(--line-strong); border-radius: 4px; }
+.ad__split--best .ad__bar span { background: var(--accent); }
+.ad__split--best .ad__pace { font-weight: 700; }
+.ad__hr, .ad__elev { color: var(--muted); text-align: right; font-size: 0.82rem; }
+@media (max-width: 480px) { .ad__split { grid-template-columns: 2.2rem 1fr 3rem 3.8rem; } .ad__elev { display: none; } }
