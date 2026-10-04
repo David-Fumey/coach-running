@@ -59,7 +59,7 @@ export default function PlanView({ plan, done, onToggle, onEdit, paces, paceRef,
         <section className="card upgrade-card" aria-labelledby="upgrade-title">
           <h2 id="upgrade-title" className="card__title">Nouvelles séances disponibles</h2>
           <p className="hint">
-            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sortie progressive, avec l'allure de chaque portion. Les dates, les kilomètres et les séances déjà faites ne changent pas.
+            {upgradable === 1 ? "1 séance à venir peut" : `${upgradable} séances à venir peuvent`} passer au nouveau catalogue : côtes, pyramides, intervalles au seuil, sorties longues variées, avec l'allure de chaque portion. Les dates, les kilomètres et les séances déjà faites ne changent pas.
           </p>
           <div className="actions">
             <button type="button" className="btn btn--primary" onClick={onUpgrade}>

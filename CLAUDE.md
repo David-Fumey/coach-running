@@ -12,7 +12,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 4. Import automatique des sorties de la montre Garmin via Strava (v0.6 : fait, à essayer avec un vrai compte).
 5. Écran Progrès filtrable : programme actuel ou total, graphiques par semaine, mois ou année (v0.7, fait), avec records personnels (v0.8, fait).
 6. Allures cibles par séance, déduites de la moyenne des sorties enregistrées (v0.9, fait), avec temps objectif de course (v0.10, fait), et décalage du programme avec pause (v0.11, fait), et onglet Hydratation (v0.12, fait).
-7. Déroulé pas à pas des séances, avec l'allure de chaque portion (v0.13, fait), et catalogue de séances de qualité variées : côtes, pyramides, intervalles au seuil, sortie progressive (v0.14, fait).
+7. Déroulé pas à pas des séances, avec l'allure de chaque portion (v0.13, fait), et catalogue de séances de qualité variées : côtes, pyramides, intervalles au seuil, sortie progressive (v0.14, fait), puis sorties longues variées : progressive, alternance, blocs au seuil (v0.15, fait).
 
 ## Stack
 

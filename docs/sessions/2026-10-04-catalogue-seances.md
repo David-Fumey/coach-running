@@ -36,3 +36,13 @@
 - Sorties longues variées (progressive, alternance d'allures, blocs au seuil).
 - Séance de contrôle (test 5 km ou 30 min) pour recaler les allures.
 - Jours de repos, renforcement, vélo.
+
+## Sorties longues variées (ajout)
+
+- Les sorties longues passent aussi par des données (`Workout`, sans échauffement ni retour au calme) : `longWorkout` dans `workouts.ts`.
+- **Formats** : facile et régulière (la majorité), **progressive** (dernier quart en accélérant jusqu'à l'allure marathon ; à allure de course en phase spécifique semi / marathon), **en alternance** (n × 1 km à allure marathon / 1 km facile en construction ; n × 2 km à allure de course / 2 km facile en phase spécifique semi / marathon), **blocs au seuil** (2 ou 3 × 2 km au seuil, 1 km facile entre eux, dès 12 km), **fin à allure de course** (30 % des km, semi et marathon à partir de 14 km, comme avant).
+- **Rotation** (rang parmi les sorties longues de la phase, semaines de récupération exclues) : base = facile, facile, progressive ; construction = facile, progressive, facile, alternance, facile, seuil ; spécifique semi / marathon = fin à allure de course, alternance ; spécifique 5 km / 10 km = facile, progressive. Les semaines de récupération et l'affûtage restent faciles.
+- Seuils de distance : pas de progressive sous 8 km, pas d'alternance ni de seuil sous 12 km.
+- `targetsFor` : sortie longue facile = comparable à la cible ; avec un effort au programme, allure facile puis allures de l'effort (non comparable). Avec un temps objectif, l'allure de course devient l'allure objectif.
+- Les anciennes sorties longues gardent leur affichage d'avant ; `upgradePlan` les met aussi à jour (la carte du Programme le précise).
+- Tests : `test:workouts` couvre la distance du déroulé, la rotation, les formats, la récupération et l'affûtage faciles.
