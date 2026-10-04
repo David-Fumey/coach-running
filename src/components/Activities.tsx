@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { diffDays, type Plan, type Session } from "../lib/plan";
-import { FEELINGS, byDateDesc, paceOf, parseMinutes, type Activity } from "../lib/activities";
+import { FEELINGS, groupByMonth, paceOf, parseMinutes, type Activity, type MonthGroup } from "../lib/activities";
 import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 import { todayISO } from "../storage";
 import type { StravaApi } from "../useStrava";
@@ -42,6 +42,8 @@ export default function Activities({ plan, done, activities, presetSessionId, on
   const [error, setError] = useState("");
   /** Activité dont le détail est ouvert */
   const [openId, setOpenId] = useState<string | undefined>();
+  /** Mois ouverts ou fermés par l'utilisateur ; sans choix, seul le mois le plus récent est ouvert */
+  const [monthsOpen, setMonthsOpen] = useState<Record<string, boolean>>({});
 
   // Séances proposables : pas encore faites et au plus tard aujourd'hui, plus la séance déjà liée ou présélectionnée.
   const open = sessions.filter((s) => (!done[s.id] && diffDays(s.date, today) >= 0) || s.id === presetSessionId || s.id === sessionId);
@@ -101,7 +103,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
     reset();
   }
 
-  const sorted = [...activities].sort(byDateDesc);
+  const groups = groupByMonth(activities);
 
   return (
     <div className="activities">
@@ -197,11 +199,21 @@ export default function Activities({ plan, done, activities, presetSessionId, on
         </form>
       )}
 
-      {sorted.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="hint empty">Aucune activité pour l'instant. Enregistre ta première sortie pour alimenter tes statistiques.</p>
       ) : (
-        <ul className="activity-list">
-          {sorted.map((a) => {
+        <div className="months">
+          {groups.map((g, i) => (
+            <details key={g.month} className="month" open={monthsOpen[g.month] ?? i === 0} onToggle={(e) => {
+                const isOpen = (e.currentTarget as HTMLDetailsElement).open;
+                setMonthsOpen((prev) => ({ ...prev, [g.month]: isOpen }));
+              }}>
+              <summary>
+                <span className="month__name">{fmtDate(`${g.month}-01`, { month: "long", year: "numeric" })}</span>
+                <span className="month__meta">{monthSummary(g)}</span>
+              </summary>
+              <ul className="activity-list">
+                {g.activities.map((a) => {
             const s = a.sessionId ? byId.get(a.sessionId) : undefined;
             return (
               <li key={a.id} className={`activity${openId === a.id ? " activity--open" : ""}`}>
@@ -236,11 +248,19 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                 )}
               </li>
             );
-          })}
-        </ul>
+                })}
+              </ul>
+            </details>
+          ))}
+        </div>
       )}
     </div>
   );
+}
+
+/** « 12 sorties · 85,5 km · 9 h 12 » */
+function monthSummary(g: MonthGroup) {
+  return `${g.activities.length} ${g.activities.length > 1 ? "sorties" : "sortie"} · ${fmtKm(g.km)} km · ${fmtDuration(g.minutes)}`;
 }
 
 /** Minutes décimales → saisie relisible par parseMinutes (« 38:30 » ou « 1:05:30 »). */

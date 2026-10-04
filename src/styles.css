@@ -3962,17 +3962,11 @@ body {
   }
 
   /* Listes de cartes sur deux colonnes (les semaines du programme restent sur une seule) ; une carte ouverte ne déforme pas sa voisine. */
-  .activity-list,
   .recipe-list,
   .topic-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
     gap: 1rem;
-  }
-
-  /* Activités : une sortie ouverte prend toute la largeur pour ses courbes. */
-  .activity--open {
-    grid-column: 1 / -1;
   }
 
   /* Détail d'une sortie : les deux courbes côte à côte, le reste en pleine largeur. */
@@ -4012,4 +4006,70 @@ body {
   .segmented--4 {
     max-width: 38rem;
   }
+}
+
+/* ---------- Activités par mois ---------- */
+
+.months {
+  display: grid;
+  gap: 1rem;
+}
+
+.month > summary {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.125rem 1rem;
+  padding: 0.625rem 2.5rem 0.625rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--p-construction);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  list-style: none;
+}
+
+.month > summary::-webkit-details-marker {
+  display: none;
+}
+
+.month > summary::after {
+  content: "";
+  position: absolute;
+  right: 1.125rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.2s;
+}
+
+.month[open] > summary::after {
+  transform: translateY(-30%) rotate(-135deg);
+}
+
+.month__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  line-height: 1.1;
+}
+
+.month__name::first-letter {
+  text-transform: uppercase;
+}
+
+.month__meta {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.month > .activity-list {
+  margin-top: 0.75rem;
 }
