@@ -90,6 +90,29 @@ export interface StrengthWorkout {
   exercises: Exercise[];
 }
 
+/** Une étape d'une séance reprise d'ailleurs : une distance ou une durée, avec son allure écrite telle quelle. */
+export interface SessionStep {
+  kind: "easy" | "work" | "rest" | "walk";
+  label: string;
+  distanceM?: number;
+  seconds?: number;
+  /** Allure en min/km ; `slow` et `fast` égaux pour une allure unique */
+  pace?: { slow: number; fast: number };
+  /** « plafond » : pas plus vite que `pace.fast` ; « fourchette » : allure visée */
+  paceMode?: "fourchette" | "plafond";
+  effort?: string;
+}
+
+/** Un bloc d'une séance reprise d'ailleurs (échauffement, répétitions, retour au calme…). */
+export interface SessionBlock {
+  id: string;
+  title: string;
+  tone: "warmup" | "main" | "cooldown" | "strides";
+  /** Nombre de passages dans les étapes du bloc */
+  repeat: number;
+  steps: SessionStep[];
+}
+
 export interface Session {
   id: string;
   date: string;
@@ -101,6 +124,8 @@ export interface Session {
   workout?: Workout;
   /** Séance de renforcement (type « strength ») */
   strength?: StrengthWorkout;
+  /** Déroulé écrit à la main pour une séance reprise d'ailleurs : il remplace tout déroulé calculé */
+  blocks?: SessionBlock[];
 }
 
 export interface Week {

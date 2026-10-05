@@ -76,6 +76,8 @@ function workoutOf(plan: Plan, session: Session, phase: string): Workout | null 
 export function workoutBlocks(plan: Plan, session: Session, model: PaceModel | null): WorkoutBlock[] | null {
   const week = plan.weeks.find((w) => w.sessions.some((s) => s.id === session.id));
   if (!week) return null;
+  // Déroulé repris tel quel d'un autre plan : ni allure recalculée, ni étape devinée.
+  if (session.blocks && session.blocks.length > 0) return session.blocks;
   const race = plan.input.race;
   const phase = week.phase;
   const targets = model ? targetsFor(model, plan, session) : null;

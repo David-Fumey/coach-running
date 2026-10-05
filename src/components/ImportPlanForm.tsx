@@ -11,8 +11,16 @@ interface Props {
 }
 
 const EXAMPLE = `2026-10-06 ; Course facile de 10 km ; 10
-2026-10-08 ; Fractionnés ; 9
-2026-10-11 ; Sortie longue progressive ; 16`;
+2026-10-08 ; Fractionnés en km ; 9
+Échauffement
+- 1,5 km, pas plus vite que 7:30/km
+Répéter 3x
+- 1 km à 7:05/km
+- 1 km à 6:30/km
+Repos
+- Marche 90 s
+Retour au calme
+- 1,5 km conversationnelle`;
 
 /** Reprise d'un plan créé ailleurs : on colle les séances, une par ligne. */
 export default function ImportPlanForm({ hasPlan, onSubmit, onCancel }: Props) {
@@ -71,6 +79,13 @@ export default function ImportPlanForm({ hasPlan, onSubmit, onCancel }: Props) {
         <p className="hint">
           Format : date (AAAA-MM-JJ) ; titre ; kilomètres. Les séances après la course ne sont pas reprises, les lignes qui commencent par # sont ignorées.
         </p>
+        <details className="hint import-help">
+          <summary>Ajouter le déroulé d'une séance (allures, répétitions, marche)</summary>
+          <p>
+            Sous la ligne d'une séance, une ligne sans tiret ouvre un bloc (« Échauffement », « Répéter 3x », « Repos », « Retour au calme »…) et chaque étape est une ligne avec un tiret : distance ou durée, puis l'allure.
+            Allures acceptées : « à 7:05/km », « 6:30-7:00 », « pas plus vite que 7:30/km » (ou « &gt;= 7:30 »), « conversationnelle ». « Marche 90 s » ou « Marche de repos 90 s » pour la marche. Ce qui suit « | » est une consigne affichée sous l'étape. Sans bloc, les étapes forment un bloc « Séance ».
+          </p>
+        </details>
       </div>
 
       {errors.length > 0 && (

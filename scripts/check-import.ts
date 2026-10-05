@@ -1,5 +1,5 @@
 import { addDays, mondayOf, type Plan } from "../src/lib/plan.ts";
-import { buildImportedPlan, inferType, parseSessions } from "../src/lib/planimport.ts";
+import { buildImportedPlan, inferType, parseSessions, parseStep } from "../src/lib/planimport.ts";
 import { upgradePlan, upgradableCount } from "../src/lib/workouts.ts";
 import { workoutBlocks } from "../src/lib/steps.ts";
 import { makeBackup, parseBackup, EMPTY_SNAPSHOT } from "../src/lib/backup.ts";
@@ -40,8 +40,8 @@ check("lecture : toutes les séances reconnues", parsed.ok && parsed.sessions.le
 if (!parsed.ok) process.exit(1);
 check("lecture : virgule décimale, « km » accepté", parsed.sessions[4].km === 7.5 && parseSessions("2026-10-06 | Footing | 5 km").ok);
 
-const bad = parseSessions("2026-02-30 ; Footing ; 5\nhier ; Footing ; 5\n2026-10-06 ; ; 5\n2026-10-06 ; Footing ; abc\n2026-10-06 ; Footing ; 5\n2026-10-06 ; Autre ; 6\nligne sans séparateur");
-check("lecture : chaque ligne en erreur signalée", !bad.ok && bad.errors.length === 6 && bad.errors[0].startsWith("Ligne 1"), bad);
+const bad = parseSessions("hier ; Footing ; 5\n2026-02-30 ; Footing ; 5\n2026-10-06 ; ; 5\n2026-10-06 ; Footing ; abc\n2026-10-06 ; Footing ; 5\n2026-10-06 ; Autre ; 6\n2026-10-07");
+check("lecture : chaque ligne en erreur signalée", !bad.ok && bad.errors.length === 6 && bad.errors[0].startsWith("Ligne 1") && bad.errors[1].startsWith("Ligne 2"), bad);
 check("lecture : texte vide refusé", !parseSessions("  \n# rien").ok);
 
 check("type : sorties longues, course, tempo, qualité, facile", inferType("Sortie longue progressive") === "long" && inferType("Course sur semi-marathon") === "race" && inferType("Tempo sur 5 km") === "tempo" && inferType("Km d'entraînement à allure") === "tempo" && inferType("Fractionnés en km") === "quality" && inferType("1 km + 200 m") === "quality" && inferType("400 m variables") === "quality" && inferType("Course facile de 10 km") === "easy");
@@ -94,6 +94,92 @@ check("plan : plus de 60 semaines, refusé", err.includes("60 semaines"), err);
 const text = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [], done: {}, confirmed: true }, new Date("2026-10-05T10:00:00Z"));
 const back = parseBackup(text);
 check("sauvegarde : le plan repris survit à l'aller-retour, source comprise", back.ok && back.data.plan?.source === "Runna" && back.data.plan.weeks[0].sessions.length === 3, back);
+
+// ---------- Déroulé des séances : allures, répétitions, marche ----------
+const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+const mmss = (m: number, sec: number) => m + sec / 60;
+const st = (t: string) => {
+  const r = parseStep(t);
+  if (typeof r === "string") throw new Error(r);
+  return r;
+};
+const a1 = st("1,5 km conversationnelle, pas plus vite que 7:30/km");
+check("étape : « pas plus vite que » donne un plafond", a1.kind === "easy" && a1.distanceM === 1500 && a1.paceMode === "plafond" && near(a1.pace!.fast, 7.5) && a1.label === "Allure conversationnelle", a1);
+const a2 = st("1 km >= 7:30");
+check("étape : « >= 7:30 » est la même chose", a2.paceMode === "plafond" && near(a2.pace!.fast, 7.5) && a2.distanceM === 1000);
+const a3 = st("1 km à 7:05/km");
+check("étape : allure unique", a3.kind === "work" && near(a3.pace!.fast, mmss(7, 5)) && a3.pace!.fast === a3.pace!.slow && a3.paceMode === "fourchette", a3);
+check("étape : « 1 km : 7:05/km » (écriture de Runna) lue aussi", st("1 km : 7:05/km").distanceM === 1000 && near(st("1 km : 7:05/km").pace!.fast, mmss(7, 5)));
+const a4 = st("5 km 6:30-7:00");
+check("étape : fourchette d'allures", near(a4.pace!.fast, 6.5) && near(a4.pace!.slow, 7) && a4.paceMode === "fourchette");
+check("étape : distance en mètres, durée en minutes et en secondes", st("200 m à 5:45/km").distanceM === 200 && st("2 min facile").seconds === 120 && st("45 s à 5:00/km").seconds === 45);
+const a5 = st("Marche de repos de 90 s");
+check("étape : marche de repos", a5.kind === "rest" && a5.seconds === 90 && a5.pace === undefined && a5.label === "Marche de repos");
+check("étape : marche active", st("Marche 5 min").kind === "walk" && st("Marche 5 min").seconds === 300);
+const a6 = st("2 km conversationnelle | Ajoutez deux fois 15 secondes d'accélérations");
+check("étape : consigne après |", a6.kind === "easy" && a6.effort === "Ajoutez deux fois 15 secondes d'accélérations" && a6.pace === undefined);
+check("étape : allure absente, allure libre", st("3 km").label === "Allure libre" && st("3 km").pace === undefined);
+check("étape : erreurs claires", typeof parseStep("à 7:05/km") === "string" && typeof parseStep("1 km à 7:75/km") === "string" && typeof parseStep("1 km à 1:05/km") === "string" && typeof parseStep("Marche") === "string" && typeof parseStep("0 km") === "string");
+
+// Les trois séances vues dans l'application Runna : fractionné en kilomètres, sortie progressive, 1 km + 200 m avec marche.
+const DETAILED = `
+2026-10-08 ; Fractionnés en km ; 9
+Échauffement
+- 1,5 km conversationnelle, pas plus vite que 7:30/km
+Répéter 3x
+- 1 km à 7:05/km
+- 1 km à 6:30/km
+Repos
+- Marche de repos de 90 s
+Retour au calme
+- 1,5 km conversationnelle | Ou plus lentement !
+2026-10-11 ; Sortie longue progressive ; 16
+- 6 km à 7:30/km
+- 5 km à 7:15/km
+- 4 km à 7:05/km
+- 1 km conversationnelle
+2026-10-22 ; 1 km + 200 m ; 6
+Échauffement
+- 2 km conversationnelle | Ajoutez deux fois 15 secondes d'accélérations rapides à votre jogging d'échauffement
+- Marche de repos de 90 s
+Répéter 2x
+- 1 km à 6:20/km
+- 200 m à 5:45/km
+- Marche de repos de 120 s
+Retour au calme
+- 1,6 km conversationnelle | ou plus lentement !
+2026-11-01 ; Course sur semi-marathon ; 21,1
+`;
+const det = parseSessions(DETAILED);
+check("déroulé : trois séances détaillées et la course sans détail", det.ok && det.sessions.length === 4 && det.sessions[3].blocks === undefined, det);
+if (det.ok) {
+  const [frac, prog, cote] = det.sessions;
+  const meters = (b: NonNullable<typeof frac.blocks>) => b.reduce((acc, x) => acc + x.repeat * x.steps.reduce((a, y) => a + (y.distanceM ?? 0), 0), 0);
+  check("fractionné : blocs échauffement, répétitions x3, repos, retour au calme", frac.blocks!.map((b) => b.title + "/" + b.repeat + "/" + b.tone).join() === "Échauffement/1/warmup,Séance/3/main,Repos/1/cooldown,Retour au calme/1/cooldown", frac.blocks!.map((b) => b.title));
+  check("fractionné : les distances font bien les 9 km de la séance", meters(frac.blocks!) === 9000, meters(frac.blocks!));
+  check("fractionné : deux allures dans la répétition, plafond à l'échauffement, repos en marche", frac.blocks![1].steps.length === 2 && near(frac.blocks![1].steps[1].pace!.fast, 6.5) && frac.blocks![0].steps[0].paceMode === "plafond" && frac.blocks![2].steps[0].kind === "rest");
+  check("progressive : un seul bloc, allures de plus en plus rapides, 16 km", prog.blocks!.length === 1 && prog.blocks![0].title === "Séance" && prog.blocks![0].repeat === 1 && prog.blocks![0].steps.map((x) => x.pace?.fast ?? 0).join() === [mmss(7, 30), mmss(7, 15), mmss(7, 5), 0].join() && meters(prog.blocks!) === 16000, prog.blocks);
+  check("1 km + 200 m : marche dans l'échauffement et dans la répétition, 6 km", cote.blocks![0].steps.length === 2 && cote.blocks![0].steps[1].kind === "rest" && cote.blocks![1].repeat === 2 && cote.blocks![1].steps.length === 3 && cote.blocks![1].steps[2].seconds === 120 && meters(cote.blocks!) === 6000, cote.blocks);
+  check("1 km + 200 m : consigne de l'échauffement gardée", cote.blocks![0].steps[0].effort?.startsWith("Ajoutez deux fois 15 secondes") === true);
+
+  const dp = buildImportedPlan(det.sessions, { race: "semi", raceDate: "2026-11-01", text: "", source: "Runna", today: "2026-10-05" });
+  const frac2 = dp.weeks.flatMap((w) => w.sessions).find((x) => x.title === "Fractionnés en km")!;
+  const shown = workoutBlocks(dp, frac2, null);
+  check("pas à pas : la séance reprise affiche son déroulé, sans modèle d'allures", shown !== null && shown.length === 4 && shown[1].repeat === 3 && shown[0].steps[0].paceMode === "plafond", shown);
+  const strava = workoutBlocks(dp, dp.weeks.flatMap((w) => w.sessions).find((x) => x.title.startsWith("Course sur"))!, null);
+  check("pas à pas : une séance sans détail garde l'affichage de base", strava !== null && strava.length === 1, strava);
+  const shifted = shiftPlan(dp, 1, {}, "2026-10-05");
+  check("décalage : le déroulé suit la séance", shifted.ok && shifted.plan.weeks.flatMap((w) => w.sessions).find((x) => x.title === "Fractionnés en km")?.blocks?.length === 4);
+}
+const headless = parseSessions("- 1 km à 7:05/km");
+check("déroulé : une étape avant toute séance est refusée", !headless.ok && headless.errors[0].startsWith("Ligne 1"), headless);
+const empty = parseSessions("2026-10-06 ; Fractionnés ; 9\nÉchauffement\nRépéter 3x\n- 1 km à 7:05/km");
+check("déroulé : un bloc sans étape est signalé", !empty.ok && empty.errors[0].includes("aucune étape"), empty);
+const wrongTimes = parseSessions("2026-10-06 ; Fractionnés ; 9\nRépéter 1x\n- 1 km à 7:05/km");
+check("déroulé : une seule répétition refusée", !wrongTimes.ok, wrongTimes);
+const badStep = parseSessions("2026-10-06 ; Fractionnés ; 9\n- à 7:05\n2026-10-07 ; Footing ; 5");
+check("déroulé : étape illisible signalée avec son numéro de ligne, la suite est lue", !badStep.ok && badStep.errors.length === 1 && badStep.errors[0].startsWith("Ligne 2"), badStep);
+check("déroulé : écritures de répétition (x3, 3 fois, Repeter 4x)", ["Répéter x3", "3x", "x3", "3 fois", "Repeter 3x"].every((h) => { const r = parseSessions("2026-10-06 ; Fractionnés ; 3\n" + h + "\n- 1 km à 7:00/km"); return r.ok && r.sessions[0].blocks![0].repeat === 3; }));
 
 // ---------- Décalage d'un plan repris : tout est décalé, la course aussi, aucune semaine perdue ----------
 const one = shiftPlan(plan, 1, {}, "2026-10-05");

@@ -19,6 +19,16 @@ Reprendre dans Runner le programme en cours sur Runna, dont l'utilisateur a envo
 - `npm run test:import` : 34 vérifications, avec le vrai plan de semi-marathon de l'utilisateur ; les vingt scripts sont verts.
 - Vérifié à l'écran : formulaire, relecture (4 semaines, 11 séances, 35 / 28,5 / 23 / 27,6 km) et onglet Programme.
 
+## Déroulé des séances reprises (allures, répétitions, marche)
+
+Demande : reprendre aussi le déroulé détaillé des séances (captures de Runna : fractionné en km, sortie progressive, 1 km + 200 m avec marche).
+
+- Sous la ligne d'une séance, une ligne sans tiret ouvre un **bloc** (« Échauffement », « Répéter 3x », « Repos », « Retour au calme »…) et chaque **étape** est une ligne avec un tiret : distance ou durée, puis l'allure. Des étapes sans bloc forment un bloc « Séance » (sortie progressive).
+- Allures : « à 7:05/km » (unique), « 6:30-7:00 » (fourchette), « pas plus vite que 7:30/km » ou « >= 7:30 » (plafond, affiché « Pas plus vite que 7:30 /km »), « conversationnelle ». « Marche 90 s » / « Marche de repos 90 s » pour la marche. Ce qui suit « | » est une consigne sous l'étape.
+- Stocké dans `Session.blocks` (`SessionBlock` / `SessionStep` dans `plan.ts`) ; `workoutBlocks` le renvoie tel quel, sans allure recalculée ni modèle d'allures requis. Il suit la séance quand le programme est décalé. Une séance sans déroulé garde l'affichage de base.
+- Allures exactes à la seconde (pas d'arrondi à 5 s pour les allures reprises).
+- `npm run test:import` : 60 vérifications.
+
 ## Limites
 
 - Trois titres étaient tronqués sur les captures (« Sortie longue progressive… », « Sortie longue d'entraînem… », « Km d'entraînement à allure… ») : repris sous une forme courte.

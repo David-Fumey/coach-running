@@ -16,7 +16,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 8. Détail d'une sortie importée : temps par kilomètre, cadence, calories, et courbes d'allure et de fréquence cardiaque, lus dans Strava et affichés au clic (v0.21, fait).
 9. Onglet Exercices : échauffement avant les séances et étirements après, chaque exercice détaillé dans une carte dépliable, avec routines selon le type de séance et illustrations en bonshommes de traits (v0.22, fait).
 10. Interface plus fine et plus colorée, version PC à partir de 1024 px (menu latéral, pleine largeur pour les listes et graphiques), activités regroupées par mois pliables, progrès affichables par jour (v0.23, fait).
-11. Installation sur téléphone en PWA (icônes PNG, manifeste complet) et données Strava en plus : vitesse, altitudes, puissance, matériel, tracé, segments, zones de FC, cadence, pente, température, totaux du compte, chaussures, itinéraires, clubs (v0.24, fait), puis reprise d'un plan externe (Runna…) collé séance par séance (v0.25, fait).
+11. Installation sur téléphone en PWA (icônes PNG, manifeste complet) et données Strava en plus : vitesse, altitudes, puissance, matériel, tracé, segments, zones de FC, cadence, pente, température, totaux du compte, chaussures, itinéraires, clubs (v0.24, fait), puis reprise d'un plan externe (Runna…) collé séance par séance, avec décalage de tout le programme (v0.25, fait), et déroulé écrit des séances reprises : allures, répétitions, marche (v0.26, fait).
 
 ## Stack
 

@@ -5,9 +5,17 @@ import { fmtTargetPace } from "../lib/format";
 
 const KIND_LABEL: Record<WorkoutStep["kind"], string> = { easy: "Courir", work: "Courir", stride: "Courir", rest: "Récup.", walk: "Marcher" };
 
+/** Allure exacte à la seconde : 7.5 → « 7:30 » (une allure reprise d'un autre plan n'est pas arrondie). */
+function exactPace(minPerKm: number) {
+  const total = Math.round(minPerKm * 60);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 function paceText(step: WorkoutStep): string | null {
   if (!step.pace) return null;
-  return step.paceMode === "plafond" ? `Pas plus vite que ${fmtTargetPace(step.pace.fast)} /km` : `${fmtTargetPace(step.pace.fast)}–${fmtTargetPace(step.pace.slow)} /km`;
+  const single = step.pace.fast === step.pace.slow;
+  if (step.paceMode === "plafond") return `Pas plus vite que ${single ? exactPace(step.pace.fast) : fmtTargetPace(step.pace.fast)} /km`;
+  return single ? `${exactPace(step.pace.fast)} /km` : `${fmtTargetPace(step.pace.fast)}–${fmtTargetPace(step.pace.slow)} /km`;
 }
 
 /** Déroulé pas à pas d'une séance structurée, avec l'allure de chaque portion. Rien pour un footing simple. */
