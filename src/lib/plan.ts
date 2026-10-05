@@ -122,6 +122,8 @@ export interface Plan {
   weeks: Week[];
   warnings: string[];
   createdAt: string;
+  /** Plan repris d'ailleurs (ex. « Runna ») : ses séances ne sont pas remplacées par celles du catalogue */
+  source?: string;
 }
 
 export const RACES: Record<RaceKey, { label: string; km: number; minWeeks: number }> = {

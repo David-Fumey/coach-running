@@ -7,11 +7,13 @@ interface Props {
   initial?: PlanInput;
   onSubmit: (values: PlanFormValues) => void;
   onCancel?: () => void;
+  /** Ouvre la reprise d'un plan existant (Runna, coach…) */
+  onImport?: () => void;
 }
 
 const DAY_OPTIONS = [3, 4, 5, 6] as const;
 
-export default function SetupForm({ initial, onSubmit, onCancel }: Props) {
+export default function SetupForm({ initial, onSubmit, onCancel, onImport }: Props) {
   const [race, setRace] = useState<RaceKey>(initial?.race ?? "10k");
   const [raceDate, setRaceDate] = useState(initial?.raceDate ?? "");
   const [level, setLevel] = useState<Level>(initial?.level ?? "intermediaire");
@@ -150,6 +152,11 @@ export default function SetupForm({ initial, onSubmit, onCancel }: Props) {
         )}
       </div>
       {initial && <p className="hint">Recréer le plan efface les séances que tu as déjà validées.</p>}
+      {onImport && (
+        <button type="button" className="link setup__import" onClick={onImport}>
+          Je suis déjà un plan ailleurs (Runna, coach…) : le reprendre
+        </button>
+      )}
     </form>
   );
 }

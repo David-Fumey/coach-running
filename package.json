@@ -25,7 +25,8 @@
     "test:control": "node --experimental-strip-types scripts/check-control.ts",
     "test:strength": "node --experimental-strip-types scripts/check-strength.ts",
     "test:drills": "node --experimental-strip-types scripts/check-drills.ts",
-    "test:theme": "node --experimental-strip-types scripts/check-theme.ts"
+    "test:theme": "node --experimental-strip-types scripts/check-theme.ts",
+    "test:import": "node --experimental-strip-types scripts/check-import.ts"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",

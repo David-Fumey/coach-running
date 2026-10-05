@@ -62,6 +62,7 @@ const INTENSITY_EFFORT: Partial<Record<Intensity, string>> = {
 /** Déroulé enregistré avec la séance, ou celui qu'avaient les séances de qualité et de tempo avant le catalogue. */
 function workoutOf(plan: Plan, session: Session, phase: string): Workout | null {
   if (session.workout) return session.workout;
+  if (plan.source) return null; // plan repris d'ailleurs : pas de déroulé deviné
   if (session.type === "long") return null; // ancienne sortie longue : traitée plus bas
   if (session.type === "quality") return legacyQualityWorkout(plan.input.race, phase as Parameters<typeof legacyQualityWorkout>[1], session.km);
   if (session.type === "tempo") return legacyTempoWorkout(session.km);

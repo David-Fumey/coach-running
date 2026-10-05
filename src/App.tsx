@@ -16,6 +16,7 @@ import { addActivity, removeActivity, updateActivity, type Activity } from "./li
 import { todayISO, useStoredState } from "./storage";
 import SetupForm from "./components/SetupForm";
 import PlanReview from "./components/PlanReview";
+import ImportPlanForm from "./components/ImportPlanForm";
 import PlanView from "./components/PlanView";
 import Home from "./components/Home";
 import ShiftSuggestion from "./components/ShiftSuggestion";
@@ -63,6 +64,7 @@ export default function App() {
   // Plan d'avant le dernier décalage, pour pouvoir l'annuler. Pas dans la sauvegarde : c'est provisoire.
   const [planBeforeShift, setPlanBeforeShift] = useStoredState<Plan | null>("foulee.planprev.v1", null);
   const [editing, setEditing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [tab, setTab] = useState<Tab>("accueil");
   /** Séance à pré-sélectionner dans l'onglet Activités (depuis l'accueil) */
@@ -88,6 +90,16 @@ export default function App() {
     setConfirmed(false);
     setTab("accueil");
     setEditing(false);
+  }
+
+  /** Reprise d'un plan d'ailleurs : activités et séances cochées sont gardées, on passe par la relecture. */
+  function importPlan(next: Plan) {
+    setPlan(next);
+    setPlanBeforeShift(null);
+    setConfirmed(false);
+    setTab("accueil");
+    setEditing(false);
+    setImporting(false);
   }
 
   function toggle(id: string) {
@@ -287,6 +299,14 @@ export default function App() {
     );
   }
 
+  if (importing) {
+    return (
+      <main className="shell">
+        <ImportPlanForm hasPlan={!!plan} onSubmit={importPlan} onCancel={() => setImporting(false)} />
+      </main>
+    );
+  }
+
   if (!plan || editing) {
     return (
       <main className="shell">
@@ -294,6 +314,7 @@ export default function App() {
           initial={plan ? plan.input : undefined}
           onSubmit={createPlan}
           onCancel={plan ? () => setEditing(false) : undefined}
+          onImport={() => setImporting(true)}
         />
         {!plan && (
           <button type="button" className="link setup__import" onClick={openProfile}>

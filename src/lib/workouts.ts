@@ -429,6 +429,8 @@ export function upgradableCount(plan: Plan, done: Record<string, boolean>, today
  * qualité : le kilométrage de cette semaine-là change un peu.
  */
 export function upgradePlan(plan: Plan, done: Record<string, boolean>, today: string): Plan {
+  // Un plan repris d'ailleurs garde ses séances telles quelles.
+  if (plan.source) return plan;
   const rank = new Map<Phase, number>();
   const longRank = new Map<Phase, number>();
   let secondRank = 0;

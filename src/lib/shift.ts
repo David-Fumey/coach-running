@@ -43,6 +43,8 @@ export function shiftPlan(plan: Plan, weeks: number, done: Record<string, boolea
     return { ok: false, error: `Choisis un décalage de 1 à ${MAX_SHIFT_WEEKS} semaines.` };
   }
   if (diffDays(today, plan.input.raceDate) < 0) return { ok: false, error: "La course est déjà passée." };
+  // Le décalage régénère les séances : il écraserait celles du plan d'origine.
+  if (plan.source) return { ok: false, error: `Ce plan vient de ${plan.source} : décale-le là-bas, puis reprends-le ici.` };
 
   // Première semaine qui contient encore quelque chose à reporter.
   const k = plan.weeks.findIndex((w) => w.sessions.some((s) => s.date >= today && !done[s.id]));
