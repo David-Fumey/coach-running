@@ -29,6 +29,12 @@ Demande : reprendre aussi le déroulé détaillé des séances (captures de Runn
 - Allures exactes à la seconde (pas d'arrondi à 5 s pour les allures reprises).
 - `npm run test:import` : 60 vérifications.
 
+## Ajustements demandés après essai
+
+- **Accès depuis le Profil** : bouton « Reprendre un plan existant (Runna, coach…) » dans la carte « Mes données » (le lien en bas du formulaire de création reste). Le formulaire passe avant la page Profil dans `App.tsx`.
+- **Plus de texte ajouté** aux séances reprises : `details` est vide, et `PlanView` et `Home` n'affichent le paragraphe que s'il existe.
+- **Déroulé affiché par défaut** dans le Programme (plus de « Voir le déroulé pas à pas » à déplier), pour toutes les séances structurées.
+
 ## Limites
 
 - Trois titres étaient tronqués sur les captures (« Sortie longue progressive… », « Sortie longue d'entraînem… », « Km d'entraînement à allure… ») : repris sous une forme courte.

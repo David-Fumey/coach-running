@@ -54,6 +54,7 @@ check("plan : séances d'après la course non reprises, avertissement", plan.wee
 check("plan : phases (travail, affûtage, course)", plan.weeks.map((w) => w.phase).join() === "specifique,specifique,affutage,course", plan.weeks.map((w) => w.phase));
 check("plan : entrée du plan déduite", plan.input.race === "semi" && plan.input.raceDate === "2026-11-01" && plan.input.longDay === "dim" && plan.input.daysPerWeek === 3 && plan.input.currentWeeklyKm === 35 && plan.source === "Runna", plan.input);
 check("plan : titres et distances gardés tels quels", plan.weeks[0].sessions[2].title === "Sortie longue progressive" && plan.weeks[0].sessions[2].km === 16 && plan.weeks[3].sessions[1].type === "race" && plan.weeks[3].sessions[1].km === 21.1);
+check("plan : aucune phrase ajoutée aux séances reprises", plan.weeks.flatMap((w) => w.sessions).every((x) => x.details === ""));
 check("plan : identifiants datés, uniques", new Set(plan.weeks.flatMap((w) => w.sessions.map((s) => s.id))).size === 11 && plan.weeks[0].sessions[0].id === "s-2026-10-06");
 
 // Un plan repris n'est jamais réécrit par le catalogue, ni deviné par le pas à pas.

@@ -21,13 +21,15 @@ interface Props {
   /** Applique une sauvegarde ; retourne un message d'erreur ou null */
   onImport: (text: string) => string | null;
   onReset: () => void;
+  /** Ouvre la reprise d'un plan créé ailleurs (Runna, coach…) */
+  onImportPlan: () => void;
   strava: StravaApi;
   theme: Theme;
   onChangeTheme: (t: Theme) => void;
 }
 
 /** Page « Mon profil » : identité, morphologie, et gestion des données locales (sauvegarde en fichier). */
-export default function ProfilePage({ profile, plan, activityCount, foodCount, onSaveProfile, getBackup, onImport, onReset, strava, theme, onChangeTheme }: Props) {
+export default function ProfilePage({ profile, plan, activityCount, foodCount, onSaveProfile, getBackup, onImport, onReset, onImportPlan, strava, theme, onChangeTheme }: Props) {
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -112,6 +114,9 @@ export default function ProfilePage({ profile, plan, activityCount, foodCount, o
           </button>
           <button type="button" className="btn" onClick={() => fileInput.current?.click()}>
             Importer une sauvegarde
+          </button>
+          <button type="button" className="btn" onClick={onImportPlan}>
+            Reprendre un plan existant (Runna, coach…)
           </button>
           <input
             ref={fileInput}

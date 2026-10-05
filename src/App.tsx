@@ -100,6 +100,7 @@ export default function App() {
     setTab("accueil");
     setEditing(false);
     setImporting(false);
+    setShowProfile(false);
   }
 
   function toggle(id: string) {
@@ -268,6 +269,14 @@ export default function App() {
       />
     ) : null;
 
+  if (importing) {
+    return (
+      <main className="shell">
+        <ImportPlanForm hasPlan={!!plan} onSubmit={importPlan} onCancel={() => setImporting(false)} />
+      </main>
+    );
+  }
+
   if (showProfile) {
     return (
       <>
@@ -284,6 +293,7 @@ export default function App() {
             onSaveProfile={setProfile}
             getBackup={() => makeBackup({ plan, done, activities, confirmed, profile, foods, paceRef, goal, water, sweat, tests, favorites }, new Date())}
             onImport={importData}
+            onImportPlan={() => setImporting(true)}
             strava={strava}
             theme={theme}
             onChangeTheme={setTheme}
@@ -296,14 +306,6 @@ export default function App() {
         </main>
         {hubReady && <TabBar tab={null} onChange={goTo} />}
       </>
-    );
-  }
-
-  if (importing) {
-    return (
-      <main className="shell">
-        <ImportPlanForm hasPlan={!!plan} onSubmit={importPlan} onCancel={() => setImporting(false)} />
-      </main>
     );
   }
 

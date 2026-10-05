@@ -209,14 +209,13 @@ export function buildImportedPlan(sessions: ImportedSession[], input: ImportInpu
   const weekCount = diffDays(firstMonday, raceMonday) / 7 + 1;
   if (weekCount > 60) throw new Error("Le plan dépasse 60 semaines : vérifie les dates.");
 
-  const detailsOf = (title: string) => `Séance reprise de ton plan ${input.source} : « ${title} ». Suis les consignes de ${input.source} pour le détail ; Runner garde la date et la distance.`;
   const weeks: Week[] = [];
   for (let w = 0; w < weekCount; w++) {
     const startDate = addDays(firstMonday, w * 7);
     const end = addDays(startDate, 6);
     const list: Session[] = kept
       .filter((s) => s.date >= startDate && s.date <= end)
-      .map((s) => ({ id: `s-${s.date}`, date: s.date, type: inferType(s.title), km: s.km, title: s.title, details: detailsOf(s.title), ...(s.blocks && s.blocks.length > 0 ? { blocks: s.blocks } : {}) }));
+      .map((s) => ({ id: `s-${s.date}`, date: s.date, type: inferType(s.title), km: s.km, title: s.title, details: "", ...(s.blocks && s.blocks.length > 0 ? { blocks: s.blocks } : {}) }));
     const isLast = w === weekCount - 1;
     const phase: Phase = isLast ? "course" : w === weekCount - 2 ? "affutage" : "specifique";
     weeks.push({

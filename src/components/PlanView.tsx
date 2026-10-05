@@ -156,7 +156,7 @@ function WeekCard({ plan, paces, week, isCurrent, done, onToggle, today }: WeekP
               ) : (
                 <>
                   <PaceLine plan={plan} model={paces} session={s} />
-                  <WorkoutSteps plan={plan} model={paces} session={s} collapsed />
+                  <WorkoutSteps plan={plan} model={paces} session={s} />
                 </>
               )
             }
@@ -186,7 +186,7 @@ export function SessionRow({ session: s, isDone, isToday, onToggle, pace }: { se
           <span className="session__title">{s.title}</span>
           <span className="session__km">{s.type === "strength" ? `${s.strength?.minutes ?? 0} min` : `${fmtKm(s.km)} km`}</span>
         </div>
-        <p className="session__details">{s.details}</p>
+        {s.details && <p className="session__details">{s.details}</p>}
         {pace}
       </div>
     </li>

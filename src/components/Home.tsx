@@ -101,7 +101,7 @@ export default function Home({ plan, done, activities, onLog, onOpenProgram, onO
                 <small>km</small>
               </p>
             </div>
-            <p className="session__details">{next.details}</p>
+            {next.details && <p className="session__details">{next.details}</p>}
             <PaceLine plan={plan} model={paces} session={next} />
             <WorkoutSteps plan={plan} model={paces} session={next} />
             <SessionDrills type={next.type} onOpenDrills={onOpenDrills} />
