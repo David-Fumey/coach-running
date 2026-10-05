@@ -1,4 +1,4 @@
-import type { Plan } from "../lib/plan";
+import { addDays, type Plan } from "../lib/plan";
 import type { Activity } from "../lib/activities";
 import { missedStreak } from "../lib/shift";
 import { fmtDate } from "../lib/format";
@@ -20,7 +20,7 @@ export default function ShiftSuggestion({ plan, done, activities, onShift }: Pro
   const w = m.suggestedWeeks;
 
   function accept() {
-    if (!m || !window.confirm(`Décaler le programme de ${w} semaine${w > 1 ? "s" : ""} ? ${plan.source ? "Les séances à venir sont décalées et des semaines d'entraînement retirées avant l'affûtage." : "Les séances à venir seront remplacées et le plan recalculé jusqu'à la course."}`)) return;
+    if (!m || !window.confirm(`Décaler le programme de ${w} semaine${w > 1 ? "s" : ""} ? ${plan.source ? `Tout le programme est décalé et la course passe au ${fmtDate(addDays(plan.input.raceDate, 7 * w), { day: "numeric", month: "long" })}.` : "Les séances à venir seront remplacées et le plan recalculé jusqu'à la course."}`)) return;
     const err = onShift(w);
     if (err) window.alert(err);
   }
@@ -31,7 +31,7 @@ export default function ShiftSuggestion({ plan, done, activities, onShift }: Pro
         <p className="loss-banner__title">{m.count} séances manquées d'affilée</p>
         <p className="loss-banner__detail">
           Depuis le {fmtDate(m.firstDate, { weekday: "long", day: "numeric", month: "long" })}, aucune séance n'est validée. Une pause de <strong>{w} semaine{w > 1 ? "s" : ""}</strong> permet de reprendre
-          sans te forcer à rattraper : la date de la course ne bouge pas, {plan.source ? "des semaines d'entraînement sont retirées avant l'affûtage." : "le plan est recalculé."}
+          sans te forcer à rattraper : {plan.source ? "" : "la date de la course ne bouge pas, "}{plan.source ? "tout le programme est décalé, la course aussi." : "le plan est recalculé."}
         </p>
         <div className="loss-banner__actions">
           <button type="button" className="btn btn--primary" onClick={accept}>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RACES, type Plan } from "../lib/plan";
+import { RACES, addDays, type Plan } from "../lib/plan";
 import { MAX_SHIFT_WEEKS, shiftPlan } from "../lib/shift";
 import { fmtDate } from "../lib/format";
 import { todayISO } from "../storage";
@@ -37,7 +37,7 @@ export default function ShiftCard({ plan, done, canUndo, onShift, onUndo }: Prop
       <div className="shift-card__body">
         <p className="hint">
           {plan.source
-            ? `Les séances pas encore faites sont remplacées par une pause, puis reprennent telles qu'elles sont dans ton plan ${plan.source}. La date de la course ne bouge pas : autant de semaines d'entraînement sont retirées, juste avant l'affûtage.`
+            ? `Les séances pas encore faites sont remplacées par une pause, puis reprennent telles qu'elles sont dans ton plan ${plan.source}. Tout est décalé, fin du programme comprise : aucune semaine n'est perdue, et la date de la course est repoussée d'autant.`
             : "Les séances pas encore faites sont remplacées par une pause. La date de la course ne bouge pas : le programme reprend ensuite et se recalcule jusqu'au jour J, avec une préparation raccourcie d'autant."}
         </p>
 
@@ -59,9 +59,16 @@ export default function ShiftCard({ plan, done, canUndo, onShift, onUndo }: Prop
               <li>
                 Reprise le <strong>{fmtDate(preview.resumeDate, { weekday: "long", day: "numeric", month: "long" })}</strong>.
               </li>
-              <li>
-                Semaines d'entraînement avant la course : <strong>{before}</strong> → <strong>{preview.weeksLeft}</strong>.
-              </li>
+              {plan.source ? (
+                <li>
+                  La course passe du <strong>{fmtDate(plan.input.raceDate, { weekday: "long", day: "numeric", month: "long" })}</strong> au{" "}
+                  <strong>{fmtDate(preview.raceDate, { weekday: "long", day: "numeric", month: "long" })}</strong>.
+                </li>
+              ) : (
+                <li>
+                  Semaines d'entraînement avant la course : <strong>{before}</strong> → <strong>{preview.weeksLeft}</strong>.
+                </li>
+              )}
               {!plan.source && preview.weeksLeft < minWeeks && (
                 <li className="shift-card__warn">
                   Il restera {preview.weeksLeft} semaine{s(preview.weeksLeft)} pour un {RACES[plan.input.race].label.toLowerCase()} ({minWeeks} sont recommandées) : le plan sera condensé.
@@ -73,7 +80,7 @@ export default function ShiftCard({ plan, done, canUndo, onShift, onUndo }: Prop
                 type="button"
                 className="btn btn--primary"
                 onClick={() => {
-                  if (window.confirm(`Décaler le programme de ${weeks} semaine${s(weeks)} ? ${plan.source ? "Les séances à venir sont décalées et des semaines d'entraînement retirées avant l'affûtage." : "Les séances à venir seront remplacées et le plan recalculé jusqu'à la course."}`)) {
+                  if (window.confirm(`Décaler le programme de ${weeks} semaine${s(weeks)} ? ${plan.source ? `Tout le programme est décalé et la course passe au ${fmtDate(addDays(plan.input.raceDate, 7 * weeks), { day: "numeric", month: "long" })}.` : "Les séances à venir seront remplacées et le plan recalculé jusqu'à la course."}`)) {
                     onShift(weeks);
                     setOpen(false);
                   }

@@ -95,28 +95,29 @@ const text = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [], done: {}, con
 const back = parseBackup(text);
 check("sauvegarde : le plan repris survit à l'aller-retour, source comprise", back.ok && back.data.plan?.source === "Runna" && back.data.plan.weeks[0].sessions.length === 3, back);
 
-// ---------- Décalage d'un plan repris : mêmes séances, décalées, la course ne bouge pas ----------
-const titles = (p: Plan) => p.weeks.map((w) => w.sessions.map((x) => x.title).join(" / "));
+// ---------- Décalage d'un plan repris : tout est décalé, la course aussi, aucune semaine perdue ----------
 const one = shiftPlan(plan, 1, {}, "2026-10-05");
 check("décalage : une semaine de pause acceptée", one.ok, one);
 if (one.ok) {
   const p = one.plan;
-  check("décalage : même nombre de semaines, la première en pause", p.weeks.length === 4 && p.weeks[0].paused === true && p.weeks[0].sessions.length === 0 && p.weeks.every((w, i) => w.index === i), p.weeks.map((w) => [w.index, w.startDate]));
-  check("décalage : la semaine pas faite reprend après la pause, jour de la semaine conservé", p.weeks[1].startDate === "2026-10-12" && p.weeks[1].sessions.map((x) => x.date).join() === "2026-10-13,2026-10-15,2026-10-18" && p.weeks[1].sessions[2].title === "Sortie longue progressive" && p.weeks[1].sessions[2].km === 16, p.weeks[1].sessions);
-  check("décalage : la semaine juste avant l'affûtage est retirée", titles(p)[1].includes("Fractionnés") && !titles(p).some((t) => t.includes("Tempo sur 5 km")), titles(p));
-  check("décalage : affûtage et course gardent leur date", p.weeks[2].sessions.map((x) => x.date).join() === "2026-10-20,2026-10-22,2026-10-25" && p.weeks[3].sessions[1].date === "2026-11-01" && p.weeks[3].sessions[1].type === "race");
-  check("décalage : identifiants alignés sur les nouvelles dates, uniques", p.weeks.flatMap((w) => w.sessions).every((x) => x.id === "s-" + x.date) && new Set(p.weeks.flatMap((w) => w.sessions.map((x) => x.id))).size === p.weeks.flatMap((w) => w.sessions).length);
-  check("décalage : totaux de semaine recalculés, plan toujours repris, remarque ajoutée", p.weeks[1].totalKm === 35 && p.source === "Runna" && p.warnings.some((w) => w.startsWith("Programme décalé de 1 semaine") && w.includes("juste avant l'affûtage")) && p.warnings.some((w) => w.includes("après la course")), p.warnings);
-  check("décalage : l'entrée du plan et le plan d'origine ne bougent pas", p.input.raceDate === "2026-11-01" && plan.weeks[0].startDate === "2026-10-05" && plan.weeks[0].sessions[0].date === "2026-10-06");
+  const all = p.weeks.flatMap((w) => w.sessions);
+  check("décalage : une semaine de plus, la première en pause", p.weeks.length === 5 && p.weeks[0].paused === true && p.weeks[0].sessions.length === 0 && p.weeks.every((w, i) => w.index === i), p.weeks.map((w) => [w.index, w.startDate]));
+  check("décalage : aucune séance perdue, mêmes titres et mêmes kilomètres", all.length === 11 && all.map((x) => x.title).join() === plan.weeks.flatMap((w) => w.sessions).map((x) => x.title).join() && all.reduce((a, x) => a + x.km, 0) === plan.weeks.flatMap((w) => w.sessions).reduce((a, x) => a + x.km, 0));
+  check("décalage : chaque séance reculée d'exactement sept jours", plan.weeks.flatMap((w) => w.sessions).every((x, i) => all[i].date === addDays(x.date, 7)));
+  check("décalage : reprise le lundi suivant, jour de la semaine conservé", p.weeks[1].startDate === "2026-10-12" && p.weeks[1].sessions.map((x) => x.date).join() === "2026-10-13,2026-10-15,2026-10-18", p.weeks[1].sessions);
+  check("décalage : la course est repoussée d'une semaine", p.input.raceDate === "2026-11-08" && one.raceDate === "2026-11-08" && p.weeks[4].sessions[1].date === "2026-11-08" && p.weeks[4].sessions[1].type === "race" && p.weeks[4].phase === "course");
+  check("décalage : identifiants alignés sur les nouvelles dates, uniques", all.every((x) => x.id === "s-" + x.date) && new Set(all.map((x) => x.id)).size === all.length);
+  check("décalage : totaux de semaine gardés, plan toujours repris, remarque ajoutée", p.weeks.map((w) => w.totalKm).join() === "0,35,28.5,23,27.6" && p.source === "Runna" && p.warnings.some((w) => w.startsWith("Programme décalé de 1 semaine") && w.includes("01/11") && w.includes("08/11")) && p.warnings.some((w) => w.includes("après la course")), p.warnings);
+  check("décalage : le plan d'origine n'est pas modifié", plan.input.raceDate === "2026-11-01" && plan.weeks[0].sessions[0].date === "2026-10-06" && plan.weeks.length === 4);
   check("décalage : annulable tant que rien n'est utilisé", canUndoShift(plan, p, {}, []));
+  const again = shiftPlan(p, 2, {}, "2026-10-12");
+  check("décalage : un second décalage s'ajoute au premier", again.ok && again.plan.input.raceDate === "2026-11-22" && again.plan.weeks.length === 7 && again.plan.warnings.filter((w) => w.startsWith("Programme décalé")).length === 2, again.ok ? again.plan.warnings : again);
 }
-const two = shiftPlan(plan, 2, {}, "2026-10-05");
-check("décalage : deux semaines, on reprend directement sur l'affûtage", two.ok && two.plan.weeks[1].sessions.length === 0 && two.plan.weeks[1].paused === true && two.plan.weeks[2].sessions[0].title === "Course facile de 8 km" && two.plan.weeks[2].sessions[0].date === "2026-10-20", two.ok ? two.plan.weeks.map((w) => w.sessions.length) : two);
 const three = shiftPlan(plan, 3, {}, "2026-10-05");
-check("décalage : trop long pour laisser de la place à l'affûtage, refusé", !three.ok && three.error.includes("affûtage"), three);
+check("décalage : trois semaines, la course passe au 22 novembre", three.ok && three.plan.input.raceDate === "2026-11-22" && three.plan.weeks.length === 7 && three.plan.weeks.slice(0, 3).every((w) => w.paused), three.ok ? "" : three);
 // Une séance validée à l'avance reste à sa place ; celles du passé de la semaine aussi.
 const doneAhead = shiftPlan(plan, 1, { "s-2026-10-11": true }, "2026-10-08");
-check("décalage : séance validée à l'avance gardée à sa date, les autres décalées", doneAhead.ok && doneAhead.plan.weeks.flatMap((w) => w.sessions).filter((x) => x.id === "s-2026-10-11").length === 1 && doneAhead.plan.weeks[0].sessions.map((x) => x.date).join() === "2026-10-06,2026-10-11" , doneAhead.ok ? doneAhead.plan.weeks.map((w) => w.sessions.map((x) => x.date)) : doneAhead);
+check("décalage : séance validée à l'avance gardée à sa date, les autres décalées", doneAhead.ok && doneAhead.plan.weeks.flatMap((w) => w.sessions).filter((x) => x.id === "s-2026-10-11").length === 1 && doneAhead.plan.weeks[0].sessions.map((x) => x.date).join() === "2026-10-06,2026-10-11", doneAhead.ok ? doneAhead.plan.weeks.map((w) => w.sessions.map((x) => x.date)) : doneAhead);
 
 console.log(failures === 0 ? "\nTout est bon." : `\n${failures} échec(s).`);
 process.exit(failures === 0 ? 0 : 1);
