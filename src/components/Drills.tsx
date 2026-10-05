@@ -1,7 +1,6 @@
 import { useState } from "react";
-import Figure from "./Figure";
-import { POSES } from "../lib/poses";
-import { GUIDE, ZONE_LABEL, doseLabel, drillsOf, stretchRoutine, warmupRoutine, type Drill, type DrillKind } from "../lib/drills";
+import DrillCard from "./DrillCard";
+import { GUIDE, doseLabel, drillsOf, stretchRoutine, warmupRoutine, type DrillKind } from "../lib/drills";
 
 /** Onglet « Exercices » : échauffement avant la séance, étirements après. Chaque exercice est une carte dépliable. */
 export default function Drills() {
@@ -92,48 +91,5 @@ export default function Drills() {
         ))}
       </div>
     </div>
-  );
-}
-
-function DrillCard({ drill: d, open, onToggle }: { drill: Drill; open: boolean; onToggle: (open: boolean) => void }) {
-  return (
-    <details id={`drill-${d.id}`} className={`topic topic--zone-${d.zone}`} open={open} onToggle={(e) => onToggle((e.currentTarget as HTMLDetailsElement).open)}>
-      <summary>
-        <span className="topic__label">{d.name}</span>
-        <span className="topic__goal">
-          {doseLabel(d)} · {ZONE_LABEL[d.zone]}
-          {d.fast ? " · séances rapides" : ""}
-        </span>
-      </summary>
-      <div className="topic__body">
-        <div className={`drills__frames${(POSES[d.id] ?? []).length === 1 ? " drills__frames--one" : ""}`}>
-          {(POSES[d.id] ?? []).map((f) => (
-            <figure key={f.label} className="drills__frame">
-              <Figure pose={f.pose} />
-              <figcaption>{f.label}</figcaption>
-            </figure>
-          ))}
-        </div>
-        <p>
-          <strong>Travaille :</strong> {d.target}.
-        </p>
-        <h3 className="topic__sub">Comment faire</h3>
-        <ol className="drills__steps">
-          {d.steps.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ol>
-        <h3 className="topic__sub">Conseils</h3>
-        <ul className="tips">
-          {d.tips.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ul>
-        <div className="topic__watch">
-          <h3 className="topic__sub">Erreur fréquente</h3>
-          <p>{d.avoid}</p>
-        </div>
-      </div>
-    </details>
   );
 }
