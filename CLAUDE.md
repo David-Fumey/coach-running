@@ -16,7 +16,7 @@ Application web (PWA) de coach de course à pied, inspirée de Runna. Interface 
 8. Détail d'une sortie importée : temps par kilomètre, cadence, calories, et courbes d'allure et de fréquence cardiaque, lus dans Strava et affichés au clic (v0.21, fait).
 9. Onglet Exercices : échauffement avant les séances et étirements après, chaque exercice détaillé dans une carte dépliable, avec routines selon le type de séance et illustrations en bonshommes de traits (v0.22, fait).
 10. Interface plus fine et plus colorée, version PC à partir de 1024 px (menu latéral, pleine largeur pour les listes et graphiques), activités regroupées par mois pliables, progrès affichables par jour (v0.23, fait).
-11. Installation sur téléphone en PWA (icônes PNG, manifeste complet) et données Strava en plus : vitesse, altitudes, puissance, matériel, tracé, segments, zones de FC, cadence, pente, température, totaux du compte, chaussures, itinéraires, clubs (v0.24, fait).
+11. Installation sur téléphone en PWA (icônes PNG, manifeste complet) et données Strava en plus : vitesse, altitudes, puissance, matériel, tracé, segments, zones de FC, cadence, pente, température, totaux du compte, chaussures, itinéraires, clubs (v0.24, fait), puis reprise d'un plan externe (Runna…) collé séance par séance (v0.25, fait).
 
 ## Stack
 
@@ -54,13 +54,14 @@ npm run test:control     # vérifie le test de 5 km (placement, saisie, effet su
 npm run test:workouts    # vérifie le catalogue de séances (rotation, progression, cohérence, mise à jour d'un ancien plan)
 npm run test:drills      # vérifie les exercices d'échauffement et d'étirements et leurs routines
 npm run test:theme       # vérifie les choix de thème (clair, sombre, automatique)
+npm run test:import      # vérifie la reprise d'un plan externe (lecture, types, plan, protections)
 ```
 
 ## Conventions
 
 - Textes de l'interface et commentaires en français.
 - Dates au format `AAAA-MM-JJ`, calculées en UTC dans le moteur pour éviter les décalages d'heure d'été.
-- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts`, `paces.ts`, `goal.ts`, `shift.ts`, `hydration.ts`, `steps.ts`, `workouts.ts`, `tests.ts`, `strength.ts`, `rest.ts`, `drills.ts`, `figures.ts`, `poses.ts` ou `theme.ts` doit garder les dix-neuf scripts `npm run test:*` au vert.
+- Toute modification du moteur de plan, de `src/lib/activities.ts`, `nutrition.ts`, `backup.ts`, `advice.ts`, `recipes.ts`, `strava.ts`, `progress.ts`, `records.ts`, `paces.ts`, `goal.ts`, `shift.ts`, `hydration.ts`, `steps.ts`, `workouts.ts`, `tests.ts`, `strength.ts`, `rest.ts`, `drills.ts`, `figures.ts`, `poses.ts`, `theme.ts` ou `planimport.ts` doit garder les vingt scripts `npm run test:*` au vert.
 - Les imports de `src/lib/` utilisent l'extension `.ts` pour rester exécutables par Node seul.
 - Commits courts, au présent, en français.
 
