@@ -4,6 +4,9 @@
 // de la semaine concernée, les séances restantes sont remplacées par une pause, puis le plan est régénéré sur les
 // semaines qui restent jusqu'à la course (condensé, avec les mêmes phases, la même charge maximale et le même affûtage).
 // Le passé (séances faites ou manquées) n'est jamais touché.
+//
+// Un plan repris d'ailleurs (`plan.source`) garde ses séances : on ne les régénère pas. Elles sont décalées, et pour tenir
+// la date de la course on retire autant de semaines d'entraînement qu'on en a mises en pause, juste avant l'affûtage.
 
 import { addDays, diffDays, generatePlan, type Plan, type Session, type Week } from "./plan.ts";
 import type { Activity } from "./activities.ts";
@@ -26,6 +29,38 @@ function withExtras(w: Week, today: string): Week {
 
 const plannedKm = (w: Week) => w.sessions.reduce((a, s) => a + s.km, 0);
 
+/**
+ * Reprise d'un plan externe après la pause : les semaines restantes gardent leurs séances (même jour de la semaine,
+ * même titre, mêmes kilomètres), décalées de la durée de la pause. On retire autant de semaines d'entraînement que de
+ * semaines de pause, celles qui précèdent immédiatement l'affûtage, pour que l'affûtage et la course restent à leur date.
+ */
+function resumeImported(plan: Plan, k: number, weeks: number, done: Record<string, boolean>, today: string): { weeks: Week[]; warnings: string[]; note: string } | { error: string } {
+  const rest = plan.weeks.slice(k);
+  const first = rest[0];
+  const taperAt = rest.findIndex((w) => w.phase === "affutage" || w.phase === "course");
+  const training = taperAt < 0 ? rest.length : taperAt;
+  const s = (n: number) => (n > 1 ? "s" : "");
+  if (training < weeks) {
+    return { error: `Un décalage de ${weeks} semaine${s(weeks)} ne laisse pas de place à l'affûtage : il ne reste que ${training} semaine${s(training)} d'entraînement avant lui. Choisis un décalage plus court.` };
+  }
+  const dropFrom = training - weeks;
+  const kept = rest.filter((_, o) => o < dropFrom || o >= training);
+  const out: Week[] = kept.map((orig, j) => {
+    const startDate = addDays(first.startDate, 7 * (weeks + j));
+    const shift = diffDays(orig.startDate, startDate);
+    const { extras: _extras, ...base } = orig;
+    const sessions = orig.sessions
+      .filter((x) => !done[x.id] && (orig !== first || x.date >= today))
+      .map((x) => {
+        const date = addDays(x.date, shift);
+        return { ...x, id: `s-${date}`, date };
+      });
+    return { ...base, startDate, sessions, totalKm: Math.round(sessions.reduce((a, x) => a + x.km, 0) * 10) / 10, isRecovery: false };
+  });
+  const note = `${SHIFT_NOTE} de ${weeks} semaine${s(weeks)} le ${today.slice(8, 10)}/${today.slice(5, 7)} : la date de la course ne change pas, ${weeks} semaine${s(weeks)} d'entraînement ${weeks > 1 ? "sont retirées" : "est retirée"} juste avant l'affûtage.`;
+  return { weeks: out, warnings: plan.warnings.filter((w) => !w.startsWith(SHIFT_NOTE)), note };
+}
+
 /** Part de la charge à laquelle on reprend : plus la pause est longue, plus on reprend doucement. */
 export function resumeFactor(weeks: number): number {
   return Math.max(0.7, 1 - 0.1 * (weeks - 1));
@@ -43,8 +78,6 @@ export function shiftPlan(plan: Plan, weeks: number, done: Record<string, boolea
     return { ok: false, error: `Choisis un décalage de 1 à ${MAX_SHIFT_WEEKS} semaines.` };
   }
   if (diffDays(today, plan.input.raceDate) < 0) return { ok: false, error: "La course est déjà passée." };
-  // Le décalage régénère les séances : il écraserait celles du plan d'origine.
-  if (plan.source) return { ok: false, error: `Ce plan vient de ${plan.source} : décale-le là-bas, puis reprends-le ici.` };
 
   // Première semaine qui contient encore quelque chose à reporter.
   const k = plan.weeks.findIndex((w) => w.sessions.some((s) => s.date >= today && !done[s.id]));
@@ -56,11 +89,19 @@ export function shiftPlan(plan: Plan, weeks: number, done: Record<string, boolea
     return { ok: false, error: `Un décalage de ${weeks} semaine${weeks > 1 ? "s" : ""} ferait reprendre après la date de la course. Choisis un décalage plus court.` };
   }
 
-  // Charge de reprise : la dernière semaine complète, ou à défaut la semaine prévue.
-  const reference = k > 0 ? Math.max(plannedKm(plan.weeks[k - 1]), plannedKm(first)) : plannedKm(first) || plan.input.currentWeeklyKm;
-  const resumeKm = Math.round(reference * resumeFactor(weeks) * 2) / 2;
-
-  const regenerated = generatePlan({ ...plan.input, currentWeeklyKm: resumeKm, today: resumeDate });
+  let regenerated: { weeks: Week[]; warnings: string[] };
+  let importedNote: string | null = null;
+  if (plan.source) {
+    const r = resumeImported(plan, k, weeks, done, today);
+    if ("error" in r) return { ok: false, error: r.error };
+    regenerated = r;
+    importedNote = r.note;
+  } else {
+    // Charge de reprise : la dernière semaine complète, ou à défaut la semaine prévue.
+    const reference = k > 0 ? Math.max(plannedKm(plan.weeks[k - 1]), plannedKm(first)) : plannedKm(first) || plan.input.currentWeeklyKm;
+    const resumeKm = Math.round(reference * resumeFactor(weeks) * 2) / 2;
+    regenerated = generatePlan({ ...plan.input, currentWeeklyKm: resumeKm, today: resumeDate });
+  }
   const untilResume = (j: number): Week =>
     j === 0
       ? withExtras({ ...first, sessions: first.sessions.filter((s) => s.date < today), isRecovery: false }, today)
@@ -93,7 +134,7 @@ export function shiftPlan(plan: Plan, weeks: number, done: Record<string, boolea
   }
 
   const notes = plan.warnings.filter((w) => w.startsWith(SHIFT_NOTE));
-  const note = `${SHIFT_NOTE} de ${weeks} semaine${weeks > 1 ? "s" : ""} le ${today.slice(8, 10)}/${today.slice(5, 7)} : la date de la course ne change pas, la préparation est donc raccourcie d'autant.`;
+  const note = importedNote ?? `${SHIFT_NOTE} de ${weeks} semaine${weeks > 1 ? "s" : ""} le ${today.slice(8, 10)}/${today.slice(5, 7)} : la date de la course ne change pas, la préparation est donc raccourcie d'autant.`;
 
   return {
     ok: true,

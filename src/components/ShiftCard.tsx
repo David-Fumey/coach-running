@@ -36,7 +36,9 @@ export default function ShiftCard({ plan, done, canUndo, onShift, onUndo }: Prop
 
       <div className="shift-card__body">
         <p className="hint">
-          Les séances pas encore faites sont remplacées par une pause. La date de la course ne bouge pas : le programme reprend ensuite et se recalcule jusqu'au jour J, avec une préparation raccourcie d'autant.
+          {plan.source
+            ? `Les séances pas encore faites sont remplacées par une pause, puis reprennent telles qu'elles sont dans ton plan ${plan.source}. La date de la course ne bouge pas : autant de semaines d'entraînement sont retirées, juste avant l'affûtage.`
+            : "Les séances pas encore faites sont remplacées par une pause. La date de la course ne bouge pas : le programme reprend ensuite et se recalcule jusqu'au jour J, avec une préparation raccourcie d'autant."}
         </p>
 
         <div className="portions" role="group" aria-label="Durée de la pause">
@@ -60,7 +62,7 @@ export default function ShiftCard({ plan, done, canUndo, onShift, onUndo }: Prop
               <li>
                 Semaines d'entraînement avant la course : <strong>{before}</strong> → <strong>{preview.weeksLeft}</strong>.
               </li>
-              {preview.weeksLeft < minWeeks && (
+              {!plan.source && preview.weeksLeft < minWeeks && (
                 <li className="shift-card__warn">
                   Il restera {preview.weeksLeft} semaine{s(preview.weeksLeft)} pour un {RACES[plan.input.race].label.toLowerCase()} ({minWeeks} sont recommandées) : le plan sera condensé.
                 </li>
@@ -71,7 +73,7 @@ export default function ShiftCard({ plan, done, canUndo, onShift, onUndo }: Prop
                 type="button"
                 className="btn btn--primary"
                 onClick={() => {
-                  if (window.confirm(`Décaler le programme de ${weeks} semaine${s(weeks)} ? Les séances à venir seront remplacées et le plan recalculé jusqu'à la course.`)) {
+                  if (window.confirm(`Décaler le programme de ${weeks} semaine${s(weeks)} ? ${plan.source ? "Les séances à venir sont décalées et des semaines d'entraînement retirées avant l'affûtage." : "Les séances à venir seront remplacées et le plan recalculé jusqu'à la course."}`)) {
                     onShift(weeks);
                     setOpen(false);
                   }
