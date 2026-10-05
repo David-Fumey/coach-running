@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { StravaApi } from "../useStrava";
+import StravaAccount from "./StravaAccount";
 
 /** Date et heure de la dernière synchro, lisibles. */
 export function fmtSync(ms: number | null) {
@@ -45,6 +46,10 @@ export default function StravaCard({ strava }: { strava: StravaApi }) {
           <button type="button" className="link" disabled={busy} onClick={strava.syncAll}>
             Importer tout l'historique de mon compte Strava
           </button>
+          <details className="saccount-wrap">
+            <summary>Mon compte Strava : totaux, chaussures, itinéraires, clubs</summary>
+            <StravaAccount strava={strava} />
+          </details>
           <button
             type="button"
             className="link link--danger"

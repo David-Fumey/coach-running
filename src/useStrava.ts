@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Plan } from "./lib/plan";
-import type { Activity } from "./lib/activities";
+import { DETAIL_VERSION, type Activity } from "./lib/activities";
 import {
   EFFORT_CANDIDATES_PER_DISTANCE,
   EMPTY_STRAVA,
@@ -8,6 +8,7 @@ import {
   applyDetails,
   authorizeUrl,
   detailTargets,
+  hasScope,
   isConnected,
   mergeStrava,
   parseCallback,
@@ -16,7 +17,7 @@ import {
   tokensExpired,
   type StravaState,
 } from "./lib/strava";
-import { StravaError, exchangeCode, fetchEfforts, fetchRuns, fetchSeries, refreshTokens, type FetchLike } from "./lib/stravaClient";
+import { StravaError, exchangeCode, fetchAccount, fetchEfforts, fetchRuns, fetchSeries, fetchZones, refreshTokens, type FetchLike } from "./lib/stravaClient";
 import { useStoredState } from "./storage";
 
 export type StravaStatus =
@@ -38,6 +39,10 @@ export interface StravaApi {
   syncAll: () => void;
   /** Lit le détail d'une sortie importée (temps par km, cadence, calories). Retourne un message d'erreur, ou null si tout va bien. */
   loadDetail: (activityId: string) => Promise<string | null>;
+  /** Relit le compte (totaux, chaussures, itinéraires, clubs). Retourne un message d'erreur, ou null si tout va bien. */
+  loadAccount: () => Promise<string | null>;
+  /** Repart sur la page d'autorisation de Strava avec l'identifiant et le secret déjà enregistrés, pour accorder les droits manquants */
+  reconnect: () => void;
   /** À appeler quand les activités sont remplacées (nouveau plan, import) : tout redevient importable */
   forgetHistory: () => void;
   /** Efface tout, y compris l'historique d'import */
@@ -156,8 +161,8 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
     setStatus({ kind: "syncing" });
     exchangeCode(latest.current.state, result.code, browserFetch)
       .then((tokens) => {
-        latest.current = { ...latest.current, state: { ...latest.current.state, tokens } };
-        setState((prev) => ({ ...prev, tokens }));
+        latest.current = { ...latest.current, state: { ...latest.current.state, tokens, scopes: result.scopes } };
+        setState((prev) => ({ ...prev, tokens, scopes: result.scopes }));
         return sync();
       })
       .catch((e) => setStatus({ kind: "error", text: e instanceof StravaError ? e.message : "La connexion à Strava a échoué." }));
@@ -194,29 +199,62 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
         setState((prev) => ({ ...prev, tokens }));
       }
       let next = latest.current.activities;
-      // Détail (kilomètres, cadence, calories) : une requête, seulement s'il n'a pas encore été lu.
-      if (act.detail === undefined) {
+      // Détail (kilomètres, cadence, calories, puissance, matériel, tracé, segments) : une requête, seulement s'il n'a
+      // pas encore été lu ou s'il l'a été par une version plus ancienne de Runner.
+      if (act.detail === undefined || (act.detail.ver ?? 1) < DETAIL_VERSION) {
         const res = await fetchEfforts(tokens.accessToken, [id], browserFetch);
         if (res.stopped) return res.stopped.message;
-        if (res.details.size === 0) return "Strava n'a pas pu fournir le détail de cette sortie. Réessaie plus tard.";
+        const fresh = res.details.get(id);
+        if (!fresh) return "Strava n'a pas pu fournir le détail de cette sortie. Réessaie plus tard.";
         next = applyDetails(next, {
           efforts: new Map([...res.efforts].map(([n, e]) => [`strava:${n}`, e])),
           temps: new Map([...res.temps].map(([n, t]) => [`strava:${n}`, t])),
           details: new Map([...res.details].map(([n, d]) => [`strava:${n}`, d])),
         });
+        // Mise à jour d'un ancien détail : on garde les courbes et les zones déjà lues.
+        next = next.map((x) => (x.id === activityId && x.detail && (x.detail.ver ?? 1) < DETAIL_VERSION ? { ...x, detail: { ...fresh, ...(x.detail.series ? { series: x.detail.series } : {}), ...(x.detail.zones ? { zones: x.detail.zones } : {}) } } : x));
         setActivities(next);
       }
-      // Courbes (FC, allure, altitude) : une seconde requête, une seule fois par sortie.
-      if (act.detail?.series === undefined) {
+      // Courbes (FC, allure, altitude, cadence, puissance, tracé…) : une seconde requête, une fois par sortie.
+      const cur = () => next.find((x) => x.id === activityId)?.detail;
+      if (cur()?.series === undefined || (cur()!.series!.ver ?? 1) < DETAIL_VERSION) {
         const res = await fetchSeries(tokens.accessToken, id, browserFetch);
         if (res.series) {
           const series = res.series;
-          setActivities(next.map((x) => (x.id === activityId && x.detail && x.detail.series === undefined ? { ...x, detail: { ...x.detail, series } } : x)));
+          next = next.map((x) => (x.id === activityId && x.detail ? { ...x, detail: { ...x.detail, series } } : x));
+          setActivities(next);
         } else if (res.stopped) return res.stopped.message;
+      }
+      // Zones de fréquence cardiaque et de puissance : une troisième requête, si le droit a été accordé.
+      if (hasScope(s, "profile:read_all") && cur() && cur()!.zones === undefined) {
+        const res = await fetchZones(tokens.accessToken, id, browserFetch);
+        if (res.zones) {
+          const zones = res.zones;
+          next = next.map((x) => (x.id === activityId && x.detail ? { ...x, detail: { ...x.detail, zones } } : x));
+          setActivities(next);
+        } else if (res.stopped && res.stopped.kind !== "autorisation") return res.stopped.message;
       }
       return null;
     } catch (e) {
       return e instanceof StravaError ? e.message : "La lecture du détail a échoué.";
+    }
+  }
+
+  /** Lecture du compte à la demande : quelques requêtes, jetons renouvelés au besoin. */
+  async function loadAccount(): Promise<string | null> {
+    const s = latest.current.state;
+    if (!s.tokens) return "Connecte Strava (page Profil) pour lire ton compte.";
+    try {
+      let tokens = s.tokens;
+      if (tokensExpired(tokens, Math.floor(Date.now() / 1000))) {
+        tokens = await refreshTokens(s, tokens, browserFetch);
+        setState((prev) => ({ ...prev, tokens }));
+      }
+      const account = await fetchAccount(s, tokens.accessToken, Date.now(), browserFetch);
+      setState((prev) => ({ ...prev, account }));
+      return null;
+    } catch (e) {
+      return e instanceof StravaError ? e.message : "La lecture du compte Strava a échoué.";
     }
   }
 
@@ -247,6 +285,8 @@ export function useStrava({ plan, confirmed, activities, done, setActivities, se
     sync: () => void sync(),
     syncAll: () => void sync(true),
     loadDetail,
+    loadAccount,
+    reconnect: () => connect(latest.current.state.clientId, latest.current.state.clientSecret),
     forgetHistory: () => setState((prev) => ({ ...prev, seen: [], lastSync: null })),
     reset: () => {
       setState(EMPTY_STRAVA);

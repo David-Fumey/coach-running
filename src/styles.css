@@ -4371,3 +4371,59 @@ body {
     gap: 1.25rem;
   }
 }
+
+/* Détail d'une sortie : description, tracé, zones, segments. */
+.ad__about { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.75rem; margin: 0 0 0.75rem; }
+.ad__desc { margin: 0; color: var(--muted); white-space: pre-line; }
+.ad__badge { padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; color: #fff; background: var(--t-quality); }
+.ad__badge--long { background: var(--t-long); }
+.ad__badge--race { background: var(--p-course); color: var(--accent-ink); }
+.ad__map { margin: 1rem 0 0; }
+.ad__map figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.route { display: block; width: 100%; height: auto; border-radius: 8px; background: var(--surface-2); }
+.route__line { stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.route__start { fill: var(--c-green); stroke: var(--surface); stroke-width: 2; }
+.route__end { fill: var(--danger); stroke: var(--surface); stroke-width: 2; }
+.route__mark { fill: var(--focus); stroke: var(--surface); stroke-width: 2; }
+.ad__zonelist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.ad__zone { display: grid; grid-template-columns: 1.8rem 5.5rem 1fr 7.5rem; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.ad__zname { font-weight: 700; }
+.ad__zrange, .ad__ztime { color: var(--muted); }
+.ad__ztime { text-align: right; }
+.ad__zone--1 .ad__bar span { background: var(--p-base); }
+.ad__zone--2 .ad__bar span { background: var(--c-green); }
+.ad__zone--3 .ad__bar span { background: var(--p-course); }
+.ad__zone--4 .ad__bar span { background: var(--t-long); }
+.ad__zone--5 .ad__bar span { background: var(--danger); }
+@media (max-width: 480px) { .ad__zone { grid-template-columns: 1.8rem 1fr 6.5rem; } .ad__zone .ad__zrange { grid-column: 2 / 4; } .ad__zone .ad__bar { grid-column: 1 / 3; } }
+.ad__seglist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.ad__seglist li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.1rem 0.75rem; padding: 0.4rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.ad__segname { font-weight: 600; }
+.ad__segmeta { color: var(--muted); font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.ad__pr { margin-left: 0.5rem; padding: 0.05rem 0.45rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--accent-ink); background: var(--accent); }
+
+/* Compte Strava (page Profil). */
+.saccount-wrap { margin: 0.75rem 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); }
+.saccount-wrap > summary { cursor: pointer; padding: 0.6rem 0.75rem; font-weight: 600; }
+.saccount { padding: 0 0.75rem 0.75rem; }
+.saccount__title { display: none; }
+.saccount__sub { margin: 1rem 0 0.4rem; font-size: 1rem; }
+.saccount__sub-stat { font-weight: 400; font-size: 0.85rem; color: var(--muted); }
+.saccount__list, .saccount__routes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.saccount__list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0.2rem 0.5rem; }
+.saccount__list .saccount__name { grid-column: 1; grid-row: 1; }
+.saccount__list .saccount__meta { grid-column: 2; grid-row: 1; text-align: right; }
+.saccount__list .ad__bar { grid-column: 1 / -1; grid-row: 2; }
+.saccount__name { font-weight: 600; overflow-wrap: anywhere; }
+.saccount__meta { color: var(--muted); font-size: 0.85rem; }
+.saccount__worn { background: var(--danger) !important; }
+.saccount__routes { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+.saccount__routes li { display: grid; gap: 0.2rem; }
+.saccount__totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.5rem; margin: 0; }
+.saccount__total { padding: 0.5rem 0.65rem; border: 1px solid var(--line); border-top: 2px solid var(--p-base); border-radius: 8px; background: var(--surface); }
+.saccount__total:nth-child(2) { border-top-color: var(--p-specifique); }
+.saccount__total:nth-child(3) { border-top-color: var(--t-long); }
+.saccount__total dt { font-size: 0.78rem; color: var(--muted); }
+.saccount__total dd { margin: 0; }
+.saccount__km { font-weight: 700; font-size: 1.2rem; }
+.saccount .actions { margin-top: 0.75rem; }

@@ -1,8 +1,24 @@
 // Appels réseau vers Strava. Le CORS de Strava est ouvert : tout se fait depuis le navigateur, sans serveur.
 // `fetch` est injectable pour pouvoir tester sans réseau.
 
-import { parseBestEfforts, parseRunDetail, parseSeries, parseTemp, tokensExpired, type StravaRun, type StravaState, type StravaTokens } from "./strava.ts";
-import type { Efforts, RunDetail, Series } from "./activities.ts";
+import {
+  hasScope,
+  parseAthlete,
+  parseBestEfforts,
+  parseClubs,
+  parseRoutes,
+  parseRunDetail,
+  parseSeries,
+  parseStats,
+  parseTemp,
+  parseZones,
+  tokensExpired,
+  type StravaAccount,
+  type StravaRun,
+  type StravaState,
+  type StravaTokens,
+} from "./strava.ts";
+import type { Efforts, RunDetail, Series, Zones } from "./activities.ts";
 
 export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   ok: boolean;
@@ -166,10 +182,63 @@ export interface SeriesResult {
  */
 export async function fetchSeries(accessToken: string, id: number, fetchFn: FetchLike): Promise<SeriesResult> {
   try {
-    const body = await call(fetchFn, `${ACTIVITY_URL}/${id}/streams?keys=time,heartrate,velocity_smooth,altitude&key_by_type=true`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const body = await call(fetchFn, `${ACTIVITY_URL}/${id}/streams?keys=time,heartrate,velocity_smooth,altitude,latlng,cadence,watts,temp,grade_smooth,moving&key_by_type=true`, { headers: { Authorization: `Bearer ${accessToken}` } });
     return { series: parseSeries(body) ?? { t: [] }, stopped: null };
   } catch (e) {
     if (e instanceof StravaError && e.kind === "reponse") return { series: e.status === 404 ? { t: [] } : null, stopped: e.status === 404 ? null : e };
     return { series: null, stopped: e instanceof StravaError ? e : new StravaError("reseau", "Strava est injoignable. Vérifie ta connexion et réessaie.") };
   }
+}
+
+export interface ZonesResult {
+  /** Zones lues ; tableau vide : Strava n'en fournit pas pour cette sortie ; null : rien de marqué, on réessaiera */
+  zones: Zones[] | null;
+  stopped: StravaError | null;
+}
+
+/**
+ * Lit les zones de fréquence cardiaque et de puissance d'une activité. Strava les réserve à ses abonnés (402) : on
+ * marque alors « aucune zone » pour ne pas redemander. Un accès refusé (droit non accordé) ne marque rien.
+ */
+export async function fetchZones(accessToken: string, id: number, fetchFn: FetchLike): Promise<ZonesResult> {
+  try {
+    const body = await call(fetchFn, `${ACTIVITY_URL}/${id}/zones`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    return { zones: parseZones(body) ?? [], stopped: null };
+  } catch (e) {
+    if (e instanceof StravaError && e.kind === "reponse") return { zones: e.status === 402 || e.status === 404 ? [] : null, stopped: e.status === 402 || e.status === 404 ? null : e };
+    return { zones: null, stopped: e instanceof StravaError ? e : new StravaError("reseau", "Strava est injoignable. Vérifie ta connexion et réessaie.") };
+  }
+}
+
+const API = "https://www.strava.com/api/v3";
+
+/** Lecture facultative : un droit non accordé, un abonnement manquant ou une réponse illisible donnent null. Quota et réseau remontent. */
+async function optional(fetchFn: FetchLike, url: string, accessToken: string): Promise<unknown | null> {
+  try {
+    return await call(fetchFn, url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  } catch (e) {
+    if (e instanceof StravaError && (e.kind === "autorisation" || e.kind === "reponse")) return null;
+    throw e;
+  }
+}
+
+/**
+ * Lit le compte : identifiant et chaussures (GET /athlete), totaux de course, clubs, itinéraires. Chaque rubrique
+ * dépend d'un droit : celles qui ne sont pas accordées manquent simplement du résultat.
+ */
+export async function fetchAccount(state: Pick<StravaState, "scopes">, accessToken: string, nowMs: number, fetchFn: FetchLike): Promise<StravaAccount> {
+
+  const athlete = parseAthlete(await optional(fetchFn, `${API}/athlete`, accessToken));
+  if (!athlete) throw new StravaError("autorisation", "Strava n'a pas donné l'accès au compte. Reconnecte-toi en acceptant les droits demandés.");
+  const out: StravaAccount = { loadedAt: nowMs, athleteId: athlete.id };
+  if (hasScope(state, "profile:read_all")) out.shoes = athlete.shoes;
+  const totals = parseStats(await optional(fetchFn, `${API}/athletes/${athlete.id}/stats`, accessToken));
+  if (totals && Object.keys(totals).length > 0) out.totals = totals;
+  const clubs = parseClubs(await optional(fetchFn, `${API}/athlete/clubs`, accessToken));
+  if (clubs) out.clubs = clubs;
+  if (hasScope(state, "read_all")) {
+    const routes = parseRoutes(await optional(fetchFn, `${API}/athletes/${athlete.id}/routes?per_page=50`, accessToken));
+    if (routes) out.routes = routes;
+  }
+  return out;
 }

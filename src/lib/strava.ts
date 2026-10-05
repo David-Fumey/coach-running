@@ -2,7 +2,7 @@
 // voir `stravaClient.ts` pour le réseau. La réponse de Strava n'est jamais crue sur parole.
 
 import { type Plan } from "./plan.ts";
-import { addActivity, type Activity, type Efforts, type EffortKey, type RunDetail, type Series, type Split, type Tracked } from "./activities.ts";
+import { DETAIL_VERSION, addActivity, type Activity, type Efforts, type EffortKey, type RunDetail, type Series, type SegmentEffort, type Split, type Tracked, type Zones } from "./activities.ts";
 
 export interface StravaTokens {
   accessToken: string;
@@ -22,10 +22,25 @@ export interface StravaState {
   seen: string[];
   /** Version des données lues. En dessous de `STRAVA_SCHEMA`, la prochaine synchro relit tout l'historique. */
   schema?: number;
+  /** Droits accordés par l'utilisateur à la connexion ; absent : connexion d'avant, lecture des activités seulement */
+  scopes?: string[];
+  /** Données du compte (totaux, matériel, itinéraires, clubs), lues à la demande */
+  account?: StravaAccount;
 }
 
 /** 2 : fréquence cardiaque et dénivelé. */
 export const STRAVA_SCHEMA = 2;
+
+/** Droits demandés : activités, matériel et zones (profile:read_all), itinéraires (read_all). */
+export const STRAVA_SCOPE = "read,activity:read,profile:read_all,read_all";
+
+/** Droits supposés pour une connexion faite avant l'ajout des autres. */
+export const BASE_SCOPES = ["read", "activity:read"];
+
+export const grantedScopes = (s: Pick<StravaState, "scopes">) => s.scopes ?? BASE_SCOPES;
+export const hasScope = (s: Pick<StravaState, "scopes">, scope: string) => grantedScopes(s).includes(scope);
+/** Vrai si la connexion n'a pas tous les droits demandés aujourd'hui (il faut se reconnecter pour les accorder). */
+export const lacksScopes = (s: StravaState) => isConnected(s) && STRAVA_SCOPE.split(",").some((x) => !hasScope(s, x));
 
 export const EMPTY_STRAVA: StravaState = { clientId: "", clientSecret: "", tokens: null, lastSync: null, seen: [] };
 
@@ -69,7 +84,7 @@ export function authorizeUrl(clientId: string, redirectUri: string, state: strin
     redirect_uri: redirectUri,
     response_type: "code",
     approval_prompt: "auto",
-    scope: "read,activity:read",
+    scope: STRAVA_SCOPE,
     state,
   });
   return `https://www.strava.com/oauth/authorize?${q}`;
@@ -77,7 +92,7 @@ export function authorizeUrl(clientId: string, redirectUri: string, state: strin
 
 export type CallbackResult =
   | { kind: "none" }
-  | { kind: "code"; code: string }
+  | { kind: "code"; code: string; scopes: string[] }
   | { kind: "error"; message: string };
 
 /** Lit le retour de Strava dans l'URL. Sans `state` attendu identique, le retour est refusé (anti-CSRF). */
@@ -91,7 +106,7 @@ export function parseCallback(search: string, expectedState: string | null): Cal
   if (!q.get("scope")?.split(",").includes("activity:read")) {
     return { kind: "error", message: "Coche « Voir les données de tes activités » lors de l'autorisation, sinon Runner ne peut pas lire tes courses." };
   }
-  return { kind: "code", code: code! };
+  return { kind: "code", code: code!, scopes: q.get("scope")!.split(",") };
 }
 
 export const tokensExpired = (t: StravaTokens, nowSec: number) => t.expiresAt - 60 <= nowSec;
@@ -302,12 +317,121 @@ export function parseRunDetail(raw: unknown): RunDetail | null {
       splits.push(split);
     }
   }
-  const out: RunDetail = { splits };
+  const out: RunDetail = { splits, ver: DETAIL_VERSION };
   // Strava donne la cadence d'un seul pied : le nombre de pas par minute est le double.
   if (inRange(r.average_cadence, 30, 125)) out.cadence = Math.round(r.average_cadence * 2);
   if (inRange(r.calories, 1, 20000)) out.calories = Math.round(r.calories);
   if (inRange(r.elapsed_time, 1, 48 * 3600)) out.elapsedMinutes = round2(r.elapsed_time / 60);
   if (typeof r.device_name === "string" && r.device_name.trim() !== "") out.device = r.device_name.trim().slice(0, 60);
+  if (inRange(r.max_speed, 0.5, 12)) out.maxSpeedKmh = Math.round(r.max_speed * 36) / 10;
+  if (inRange(r.elev_high, -500, 9000)) out.elevHigh = Math.round(r.elev_high);
+  if (inRange(r.elev_low, -500, 9000)) out.elevLow = Math.round(r.elev_low);
+  // Sans capteur de puissance, Strava estime les watts : on ne garde que les mesures.
+  if (r.device_watts === true) {
+    const watts: NonNullable<RunDetail["watts"]> = {};
+    if (inRange(r.average_watts, 1, 2500)) watts.avg = Math.round(r.average_watts);
+    if (inRange(r.max_watts, 1, 5000)) watts.max = Math.round(r.max_watts);
+    if (inRange(r.weighted_average_watts, 1, 2500)) watts.weighted = Math.round(r.weighted_average_watts);
+    if (Object.keys(watts).length > 0) out.watts = watts;
+  }
+  if (typeof r.description === "string" && r.description.trim() !== "") out.description = r.description.trim().slice(0, 500);
+  const type = r.workout_type === 1 ? "race" : r.workout_type === 2 ? "long" : r.workout_type === 3 ? "workout" : undefined;
+  if (type) out.workoutType = type;
+  const gear = r.gear as { id?: unknown; name?: unknown } | null | undefined;
+  if (gear && typeof gear.id === "string" && typeof gear.name === "string" && gear.name.trim() !== "") out.gear = { id: gear.id, name: gear.name.trim().slice(0, 80) };
+  const start = latLng(r.start_latlng);
+  const end = latLng(r.end_latlng);
+  if (start) out.start = start;
+  if (end) out.end = end;
+  const map = r.map as { polyline?: unknown; summary_polyline?: unknown } | null | undefined;
+  const encoded = typeof map?.polyline === "string" && map.polyline ? map.polyline : typeof map?.summary_polyline === "string" ? map.summary_polyline : "";
+  const route = encoded ? simplify(decodePolyline(encoded), ROUTE_POINTS) : [];
+  if (route.length >= 2) out.route = route;
+  const segments = parseSegments(r.segment_efforts);
+  if (segments.length > 0) out.segments = segments;
+  return out;
+}
+
+/** Nombre de points gardés pour un tracé. */
+export const ROUTE_POINTS = 60;
+
+/** [latitude, longitude] valide, arrondi à 5 décimales (environ un mètre), sinon null. */
+function latLng(x: unknown): [number, number] | null {
+  if (!Array.isArray(x) || x.length < 2) return null;
+  const [lat, lng] = x as unknown[];
+  if (!inRange(lat, -90, 90) || !inRange(lng, -180, 180)) return null;
+  return [Math.round(lat * 1e5) / 1e5, Math.round(lng * 1e5) / 1e5];
+}
+
+/** Décode un tracé encodé au format « polyline » de Google, que Strava utilise. */
+export function decodePolyline(encoded: string): [number, number][] {
+  const out: [number, number][] = [];
+  let i = 0;
+  let lat = 0;
+  let lng = 0;
+  const next = (): number | null => {
+    let result = 0;
+    let shift = 0;
+    let b: number;
+    do {
+      if (i >= encoded.length) return null;
+      b = encoded.charCodeAt(i++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && shift < 35);
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+  while (i < encoded.length) {
+    const dLat = next();
+    const dLng = next();
+    if (dLat === null || dLng === null) break;
+    lat += dLat;
+    lng += dLng;
+    const p = latLng([lat / 1e5, lng / 1e5]);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+/** Garde n points régulièrement répartis, premier et dernier compris. */
+export function simplify<T>(points: T[], n: number): T[] {
+  if (points.length <= n) return points;
+  return Array.from({ length: n }, (_, k) => points[Math.round((k * (points.length - 1)) / (n - 1))]);
+}
+
+/** Segments Strava parcourus (30 au plus). */
+function parseSegments(raw: unknown): SegmentEffort[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SegmentEffort[] = [];
+  for (const e of raw as Record<string, unknown>[]) {
+    if (!e || typeof e.name !== "string" || !e.name.trim()) continue;
+    const seconds = inRange(e.moving_time, 1, 6 * 3600) ? e.moving_time : e.elapsed_time;
+    const meters = (e.segment as { distance?: unknown } | undefined)?.distance ?? e.distance;
+    if (!inRange(seconds, 1, 6 * 3600) || !inRange(meters, 1, 100000)) continue;
+    const seg: SegmentEffort = { name: e.name.trim().slice(0, 80), meters: Math.round(meters), seconds: Math.round(seconds) };
+    if (inRange(e.pr_rank, 1, 3)) seg.prRank = e.pr_rank;
+    const hr = heartRate(e.average_heartrate);
+    if (hr !== undefined) seg.hr = hr;
+    out.push(seg);
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+/**
+ * Zones de fréquence cardiaque et de puissance (GET /activities/{id}/zones). Tableau vide si Strava n'en fournit
+ * pas (abonnement requis) ; null si la réponse n'est pas une liste.
+ */
+export function parseZones(raw: unknown): Zones[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: Zones[] = [];
+  for (const z of raw as Record<string, unknown>[]) {
+    if (!z || (z.type !== "heartrate" && z.type !== "power") || !Array.isArray(z.distribution_buckets)) continue;
+    const buckets = (z.distribution_buckets as Record<string, unknown>[])
+      .filter((b) => b && inRange(b.min, 0, 10000) && typeof b.max === "number" && Number.isFinite(b.max) && inRange(b.time, 0, 48 * 3600))
+      .map((b) => ({ min: Math.round(b.min as number), max: Math.round(b.max as number), seconds: Math.round(b.time as number) }));
+    if (buckets.length >= 2 && buckets.some((b) => b.seconds > 0) && !out.some((x) => x.type === z.type)) out.push({ type: z.type, buckets });
+  }
   return out;
 }
 
@@ -328,16 +452,27 @@ export function parseSeries(raw: unknown): Series | null {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   const time = numbers(r.time);
-  if (!time || time.length < 2) return { t: [] };
+  if (!time || time.length < 2) return { t: [], ver: DETAIL_VERSION };
   const n = time.length;
   const hr = numbers(r.heartrate);
   const vel = numbers(r.velocity_smooth);
   const alt = numbers(r.altitude);
+  const cad = numbers(r.cadence);
+  const pow = numbers(r.watts);
+  const tmp = numbers(r.temp);
+  const grd = numbers(r.grade_smooth);
+  const latlng = (r.latlng as { data?: unknown } | null)?.data;
+  const hasRoute = Array.isArray(latlng) && latlng.length === n;
   const buckets = Math.min(SERIES_POINTS, n);
   const out: Series = { t: [] };
   const hrOut: number[] = [];
   const paceOut: number[] = [];
   const altOut: number[] = [];
+  const cadOut: number[] = [];
+  const powOut: number[] = [];
+  const tmpOut: number[] = [];
+  const grdOut: number[] = [];
+  const routeOut: [number, number][] = [];
   for (let b = 0; b < buckets; b++) {
     const from = Math.floor((b * n) / buckets);
     const to = Math.max(from + 1, Math.floor(((b + 1) * n) / buckets));
@@ -351,10 +486,31 @@ export function parseSeries(raw: unknown): Series | null {
     const v = avg(vel, (x) => x > 0.5);
     paceOut.push(v > 0 ? Math.round(1000 / v) : 0);
     altOut.push(Math.round(avg(alt, () => true)));
+    // Cadence d'un seul pied dans Strava : on double, comme pour la moyenne.
+    cadOut.push(Math.round(avg(cad, (x) => x > 0) * 2));
+    powOut.push(Math.round(avg(pow, (x) => x > 0)));
+    tmpOut.push(Math.round(avg(tmp, (x) => x > -60 && x < 60)));
+    grdOut.push(Math.round(avg(grd, (x) => x >= -60 && x <= 60) * 10) / 10);
+    if (hasRoute) {
+      const p = latLng((latlng as unknown[])[to - 1]);
+      if (p) routeOut.push(p);
+    }
   }
   if (hrOut.some((v) => v > 0)) out.hr = hrOut;
   if (paceOut.some((v) => v > 0)) out.pace = paceOut;
   if (alt && alt.length === n) out.alt = altOut;
+  if (cadOut.some((v) => v > 0)) out.cadence = cadOut;
+  if (powOut.some((v) => v > 0)) out.watts = powOut;
+  if (tmpOut.some((v) => v !== 0)) out.temp = tmpOut;
+  if (grd && grd.length === n) out.grade = grdOut;
+  if (routeOut.length === buckets) out.route = routeOut;
+  const moving = (r.moving as { data?: unknown } | null)?.data;
+  if (Array.isArray(moving) && moving.length === n) {
+    let stopped = 0;
+    for (let i = 1; i < n; i++) if (moving[i] === false) stopped += Math.max(0, time[i] - time[i - 1]);
+    out.stopped = Math.round(stopped);
+  }
+  out.ver = DETAIL_VERSION;
   return out;
 }
 
@@ -407,4 +563,125 @@ export function applyEfforts(activities: Activity[], byExternalId: Map<string, E
  */
 export function syncAfter(lastSync: number | null): number {
   return lastSync === null ? 0 : Math.floor(lastSync / 1000) - RESYNC_OVERLAP_DAYS * 86400;
+}
+
+// ---------- Compte Strava (totaux, matériel, itinéraires, clubs) ----------
+
+export interface RunTotals {
+  count: number;
+  km: number;
+  seconds: number;
+  /** Dénivelé positif, en mètres */
+  elevation: number;
+}
+
+export interface StravaShoe {
+  id: string;
+  name: string;
+  /** Kilométrage cumulé sur Strava */
+  km: number;
+}
+
+export interface StravaClub {
+  id: number;
+  name: string;
+  members?: number;
+  city?: string;
+}
+
+export interface StravaRoute {
+  id: number;
+  name: string;
+  km: number;
+  elevation?: number;
+  route?: [number, number][];
+}
+
+/** Ce que le compte a fourni à la dernière lecture. Une rubrique absente : non accordée ou indisponible. */
+export interface StravaAccount {
+  /** millisecondes Unix */
+  loadedAt: number;
+  athleteId: number;
+  totals?: { recent?: RunTotals; year?: RunTotals; all?: RunTotals };
+  shoes?: StravaShoe[];
+  clubs?: StravaClub[];
+  routes?: StravaRoute[];
+}
+
+/** Kilométrage au-delà duquel une paire de chaussures est à surveiller (repère courant : 600 à 800 km). */
+export const SHOE_WEAR_KM = 700;
+
+function totalsOf(x: unknown): RunTotals | undefined {
+  const t = x as Record<string, unknown> | null;
+  if (!t || !inRange(t.count, 0, 1e6) || !inRange(t.distance, 0, 1e9)) return undefined;
+  return {
+    count: Math.round(t.count),
+    km: Math.round(t.distance / 100) / 10,
+    seconds: inRange(t.moving_time, 0, 1e9) ? Math.round(t.moving_time) : 0,
+    elevation: inRange(t.elevation_gain, 0, 1e8) ? Math.round(t.elevation_gain) : 0,
+  };
+}
+
+/** Totaux de course (GET /athletes/{id}/stats) : 4 dernières semaines, année en cours, depuis toujours. */
+export function parseStats(raw: unknown): NonNullable<StravaAccount["totals"]> | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const out: NonNullable<StravaAccount["totals"]> = {};
+  const recent = totalsOf(r.recent_run_totals);
+  const year = totalsOf(r.ytd_run_totals);
+  const all = totalsOf(r.all_run_totals);
+  if (recent) out.recent = recent;
+  if (year) out.year = year;
+  if (all) out.all = all;
+  return out;
+}
+
+/** Identifiant et chaussures du profil (GET /athlete) : seuls ces deux éléments sont gardés. */
+export function parseAthlete(raw: unknown): { id: number; shoes: StravaShoe[] } | null {
+  const r = raw as { id?: unknown; shoes?: unknown } | null;
+  if (!r || typeof r.id !== "number" || !Number.isFinite(r.id)) return null;
+  const shoes: StravaShoe[] = [];
+  if (Array.isArray(r.shoes)) {
+    for (const g of r.shoes as Record<string, unknown>[]) {
+      if (!g || typeof g.id !== "string" || typeof g.name !== "string" || !g.name.trim() || !inRange(g.distance, 0, 1e8)) continue;
+      shoes.push({ id: g.id, name: g.name.trim().slice(0, 80), km: Math.round(g.distance / 1000) });
+    }
+  }
+  return { id: r.id, shoes };
+}
+
+export function parseClubs(raw: unknown): StravaClub[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: StravaClub[] = [];
+  for (const c of raw as Record<string, unknown>[]) {
+    if (!c || typeof c.id !== "number" || typeof c.name !== "string" || !c.name.trim()) continue;
+    const club: StravaClub = { id: c.id, name: c.name.trim().slice(0, 80) };
+    if (inRange(c.member_count, 0, 1e8)) club.members = c.member_count;
+    if (typeof c.city === "string" && c.city.trim()) club.city = c.city.trim().slice(0, 60);
+    out.push(club);
+  }
+  return out;
+}
+
+/** Itinéraires de course (type 2) enregistrés sur Strava, 20 au plus. */
+export function parseRoutes(raw: unknown): StravaRoute[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: StravaRoute[] = [];
+  for (const x of raw as Record<string, unknown>[]) {
+    if (!x || typeof x.id !== "number" || typeof x.name !== "string" || x.type !== 2 || !inRange(x.distance, 100, 1e6)) continue;
+    const route: StravaRoute = { id: x.id, name: x.name.trim().slice(0, 80) || "Itinéraire", km: Math.round(x.distance / 100) / 10 };
+    if (inRange(x.elevation_gain, 0, 1e5)) route.elevation = Math.round(x.elevation_gain);
+    const enc = (x.map as { summary_polyline?: unknown } | undefined)?.summary_polyline;
+    const pts = typeof enc === "string" ? simplify(decodePolyline(enc), ROUTE_POINTS) : [];
+    if (pts.length >= 2) route.route = pts;
+    out.push(route);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
+/** Vrai si le détail d'une sortie importée est à lire (ou à relire, après une mise à jour du format). */
+export function needsDetail(a: Activity, withZones: boolean): boolean {
+  const d = a.detail;
+  return !d || (d.ver ?? 1) < DETAIL_VERSION || !d.series || (d.series.ver ?? 1) < DETAIL_VERSION || (withZones && d.zones === undefined);
 }

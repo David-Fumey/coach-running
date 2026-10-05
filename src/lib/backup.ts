@@ -72,10 +72,29 @@ function validEfforts(e: unknown): boolean {
   return isObj(e) && Object.entries(e).every(([k, v]) => EFFORT_KEYS.includes(k) && isNum(v) && v > 0);
 }
 
+const isPoint = (p: unknown) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]);
+
 function validSeries(s: unknown): boolean {
   if (!isObj(s) || !Array.isArray(s.t) || !s.t.every(isNum)) return false;
   const n = s.t.length;
-  return (["hr", "pace", "alt"] as const).every((k) => s[k] === undefined || (Array.isArray(s[k]) && (s[k] as unknown[]).length === n && (s[k] as unknown[]).every(isNum)));
+  return (
+    (["hr", "pace", "alt", "cadence", "watts", "temp", "grade"] as const).every((k) => s[k] === undefined || (Array.isArray(s[k]) && (s[k] as unknown[]).length === n && (s[k] as unknown[]).every(isNum))) &&
+    (s.route === undefined || (Array.isArray(s.route) && s.route.length === n && s.route.every(isPoint))) &&
+    isOptNum(s.ver) && isOptNum(s.stopped)
+  );
+}
+
+function validSegment(g: unknown): boolean {
+  return isObj(g) && typeof g.name === "string" && isNum(g.meters) && isNum(g.seconds) && isOptNum(g.prRank) && isOptNum(g.hr);
+}
+
+function validZones(z: unknown): boolean {
+  return (
+    isObj(z) &&
+    (z.type === "heartrate" || z.type === "power") &&
+    Array.isArray(z.buckets) &&
+    z.buckets.every((b) => isObj(b) && isNum(b.min) && isNum(b.max) && isNum(b.seconds))
+  );
 }
 
 function validDetail(d: unknown): boolean {
@@ -85,7 +104,17 @@ function validDetail(d: unknown): boolean {
     d.splits.every((s) => isObj(s) && isNum(s.km) && s.km > 0 && isNum(s.seconds) && s.seconds > 0 && isOptNum(s.hr) && (s.elev === undefined || isNum(s.elev))) &&
     isOptNum(d.calories) && isOptNum(d.cadence) && isOptNum(d.elapsedMinutes) &&
     (d.device === undefined || typeof d.device === "string") &&
-    (d.series === undefined || validSeries(d.series))
+    (d.series === undefined || validSeries(d.series)) &&
+    isOptNum(d.ver) && isOptNum(d.maxSpeedKmh) && isOptNum(d.elevHigh) && isOptNum(d.elevLow) &&
+    (d.watts === undefined || (isObj(d.watts) && isOptNum(d.watts.avg) && isOptNum(d.watts.max) && isOptNum(d.watts.weighted))) &&
+    (d.description === undefined || typeof d.description === "string") &&
+    (d.workoutType === undefined || d.workoutType === "race" || d.workoutType === "long" || d.workoutType === "workout") &&
+    (d.gear === undefined || (isObj(d.gear) && typeof d.gear.id === "string" && typeof d.gear.name === "string")) &&
+    (d.start === undefined || isPoint(d.start)) &&
+    (d.end === undefined || isPoint(d.end)) &&
+    (d.route === undefined || (Array.isArray(d.route) && d.route.every(isPoint))) &&
+    (d.segments === undefined || (Array.isArray(d.segments) && d.segments.every(validSegment))) &&
+    (d.zones === undefined || (Array.isArray(d.zones) && d.zones.every(validZones)))
   );
 }
 

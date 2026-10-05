@@ -2,10 +2,10 @@ import { generatePlan } from "../src/lib/plan.ts";
 import { addActivity, removeActivity, type Activity, type Tracked } from "../src/lib/activities.ts";
 import { makeBackup, parseBackup, EMPTY_SNAPSHOT } from "../src/lib/backup.ts";
 import {
-  EMPTY_STRAVA, RECENT_TEMP_COUNT, applyDetails, applyEfforts, detailTargets, parseRunDetail, parseSeries, SERIES_POINTS, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
+  EMPTY_STRAVA, STRAVA_SCOPE, RECENT_TEMP_COUNT, decodePolyline, simplify, parseZones, parseStats, parseAthlete, parseClubs, parseRoutes, needsDetail, lacksScopes, hasScope, applyDetails, applyEfforts, detailTargets, parseRunDetail, parseSeries, SERIES_POINTS, parseTemp, authorizeUrl, effortCandidates, mergeStrava, parseBestEfforts, parseCallback, stravaNumericId, syncAfter, toActivity, tokensExpired,
   type StravaRun, type StravaTokens,
 } from "../src/lib/strava.ts";
-import { StravaError, fetchEfforts, fetchRuns, fetchSeries, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
+import { StravaError, fetchAccount, fetchEfforts, fetchRuns, fetchSeries, fetchZones, listActivities, type FetchLike } from "../src/lib/stravaClient.ts";
 
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 let failures = 0;
@@ -288,10 +288,15 @@ check("synchro suivante : recouvre la précédente", syncAfter(last) === last / 
 
 // ---------- Connexion ----------
 const url = new URL(authorizeUrl("123", "http://localhost:5173/", "abc"));
-check("URL d'autorisation", url.origin + url.pathname === "https://www.strava.com/oauth/authorize" && url.searchParams.get("client_id") === "123" && url.searchParams.get("scope") === "read,activity:read" && url.searchParams.get("state") === "abc");
+check("URL d'autorisation", url.origin + url.pathname === "https://www.strava.com/oauth/authorize" && url.searchParams.get("client_id") === "123" && url.searchParams.get("scope") === STRAVA_SCOPE && url.searchParams.get("state") === "abc");
 check("retour sans paramètre", parseCallback("", "abc").kind === "none");
 const okCb = parseCallback("?state=abc&code=XYZ&scope=read,activity:read", "abc");
-check("retour valide", okCb.kind === "code" && okCb.code === "XYZ");
+check("retour valide", okCb.kind === "code" && okCb.code === "XYZ" && okCb.scopes.join() === "read,activity:read");
+const fullCb = parseCallback("?state=abc&code=XYZ&scope=read,activity:read,profile:read_all,read_all", "abc");
+check("retour : droits accordés relevés", fullCb.kind === "code" && fullCb.scopes.includes("profile:read_all") && fullCb.scopes.includes("read_all"));
+const baseState = { ...EMPTY_STRAVA, tokens: { accessToken: "a", refreshToken: "r", expiresAt: 1 } };
+check("connexion ancienne : droits de base, reconnexion proposée", hasScope(baseState, "activity:read") && !hasScope(baseState, "profile:read_all") && lacksScopes(baseState));
+check("connexion complète : rien à accorder", !lacksScopes({ ...baseState, scopes: STRAVA_SCOPE.split(",") }) && !lacksScopes(EMPTY_STRAVA));
 check("retour avec mauvais state refusé", parseCallback("?state=autre&code=XYZ&scope=read,activity:read", "abc").kind === "error");
 check("retour sans state attendu refusé", parseCallback("?state=abc&code=XYZ&scope=read,activity:read", null).kind === "error");
 check("autorisation refusée", parseCallback("?state=abc&error=access_denied", "abc").kind === "error");
@@ -383,6 +388,143 @@ badHr.data.activities[0].elevation = -3;
 check("dénivelé négatif refusé", !parseBackup(JSON.stringify(badHr)).ok);
 check("externalId invalide refusé", !parseBackup(JSON.stringify(bad)).ok);
 check("état vide par défaut", EMPTY_STRAVA.tokens === null && EMPTY_STRAVA.seen.length === 0);
+
+// ---------- Données supplémentaires : détail, flux, zones, compte ----------
+{
+  // Exemple de la documentation du format polyline de Google.
+  const pts = decodePolyline("_p~iF~ps|U_ulLnnqC_mqNvxq`@");
+  check("tracé : décodage du format polyline", pts.length === 3 && near(pts[0][0], 38.5) && near(pts[0][1], -120.2) && near(pts[2][0], 43.252) && near(pts[2][1], -126.453), pts);
+  check("tracé : texte tronqué ou vide sans plantage", decodePolyline("").length === 0 && Array.isArray(decodePolyline("_p~iF")));
+  const many = Array.from({ length: 500 }, (_, i) => i);
+  const few = simplify(many, 60);
+  check("tracé : simplifié, premier et dernier points gardés", few.length === 60 && few[0] === 0 && few[59] === 499 && simplify([1, 2, 3], 60).length === 3);
+
+  const raw = {
+    max_speed: 5.2, elev_high: 312.4, elev_low: 80.6, device_watts: true, average_watts: 251.6, max_watts: 620, weighted_average_watts: 262,
+    description: "  Belle sortie au bord de l'eau  ", workout_type: 2, gear: { id: "g1", name: "Pegasus 40" },
+    start_latlng: [48.85661, 2.35222], end_latlng: [48.86, 2.36], map: { summary_polyline: "_p~iF~ps|U_ulLnnqC_mqNvxq`@" },
+    segment_efforts: [
+      { name: "Montée du parc", moving_time: 95, segment: { distance: 420 }, pr_rank: 1, average_heartrate: 171.2 },
+      { name: "Ligne droite", elapsed_time: 40, distance: 200, pr_rank: 7 },
+      { name: "", moving_time: 10, distance: 10 },
+    ],
+  };
+  const d = parseRunDetail(raw)!;
+  check("détail : vitesse max, altitudes", d.maxSpeedKmh === 18.7 && d.elevHigh === 312 && d.elevLow === 81, d);
+  check("détail : puissance mesurée", d.watts?.avg === 252 && d.watts?.max === 620 && d.watts?.weighted === 262, d.watts);
+  check("détail : puissance estimée ignorée", parseRunDetail({ ...raw, device_watts: false })!.watts === undefined && parseRunDetail({ average_watts: 200 })!.watts === undefined);
+  check("détail : description, type, matériel", d.description === "Belle sortie au bord de l'eau" && d.workoutType === "long" && d.gear?.name === "Pegasus 40" && d.gear.id === "g1");
+  check("détail : départ, arrivée et tracé", d.start?.[0] === 48.85661 && d.end?.[1] === 2.36 && d.route?.length === 3);
+  check("détail : segments (nom vide ignoré, rang au-delà de 3 ignoré)", d.segments?.length === 2 && d.segments[0].seconds === 95 && d.segments[0].meters === 420 && d.segments[0].prRank === 1 && d.segments[0].hr === 171 && d.segments[1].prRank === undefined && d.segments[1].seconds === 40, d.segments);
+  check("détail : version de lecture marquée", d.ver === 2 && parseRunDetail({})!.ver === 2);
+  const poor = parseRunDetail({ max_speed: 99, elev_high: "x", workout_type: 0, gear: { id: 5 }, start_latlng: [200, 0], map: { summary_polyline: "" }, segment_efforts: "x" })!;
+  check("détail : valeurs aberrantes ignorées", poor.maxSpeedKmh === undefined && poor.elevHigh === undefined && poor.workoutType === undefined && poor.gear === undefined && poor.start === undefined && poor.route === undefined && poor.segments === undefined, poor);
+
+  const n = 400;
+  const time = Array.from({ length: n }, (_, i) => i * 5);
+  const latlng = Array.from({ length: n }, (_, i) => [48 + i * 0.0001, 2 + i * 0.0001]);
+  const moving = Array.from({ length: n }, (_, i) => !(i >= 10 && i < 14));
+  const flux = {
+    time: { data: time }, latlng: { data: latlng }, cadence: { data: Array.from({ length: n }, () => 85) }, watts: { data: Array.from({ length: n }, () => 240) },
+    temp: { data: Array.from({ length: n }, () => 17) }, grade_smooth: { data: Array.from({ length: n }, (_, i) => (i < 200 ? 2.5 : -3)) }, moving: { data: moving },
+  };
+  const se = parseSeries(flux)!;
+  check("flux : cadence doublée (un seul pied), puissance, température", se.cadence?.every((v) => v === 170) && se.watts?.every((v) => v === 240) && se.temp?.every((v) => v === 17), se.cadence?.slice(0, 3));
+  check("flux : pente signée", se.grade?.[0] === 2.5 && se.grade[99] === -3 && se.grade.length === se.t.length, se.grade?.slice(95, 100));
+  check("flux : tracé aligné sur les courbes", se.route?.length === se.t.length && se.route[0][0] > 47.99 && se.route[99][0] > se.route[0][0]);
+  check("flux : temps à l'arrêt", se.stopped === 20, se.stopped);
+  check("flux : version de lecture marquée", se.ver === 2 && parseSeries({})!.ver === 2);
+  const none = parseSeries({ time: { data: time } })!;
+  check("flux : sans capteur, pas de courbe en trop", none.cadence === undefined && none.watts === undefined && none.temp === undefined && none.route === undefined && none.stopped === undefined);
+  check("flux : tracé de longueur différente ignoré", parseSeries({ time: { data: time }, latlng: { data: [[1, 1]] } })!.route === undefined);
+
+  const zones = parseZones([
+    { type: "heartrate", distribution_buckets: [{ min: 0, max: 120, time: 300 }, { min: 120, max: 150, time: 1200 }, { min: 150, max: -1, time: 100 }] },
+    { type: "power", distribution_buckets: [{ min: 0, max: 100, time: 0 }, { min: 100, max: -1, time: 0 }] },
+    { type: "pace", distribution_buckets: [] },
+  ]);
+  check("zones : fréquence cardiaque lue, puissance sans temps et autres types ignorés", zones?.length === 1 && zones[0].type === "heartrate" && zones[0].buckets.length === 3 && zones[0].buckets[2].max === -1, zones);
+  check("zones : réponse qui n'est pas une liste, null", parseZones({}) === null && parseZones([])!.length === 0);
+
+  const zurls: string[] = [];
+  const zr = await fetchZones("tok", 9, async (u, init) => (zurls.push(u + "|" + init?.headers?.Authorization), respE(200, [{ type: "heartrate", distribution_buckets: [{ min: 0, max: 100, time: 5 }, { min: 100, max: -1, time: 5 }] }])));
+  check("client zones : une requête, jeton envoyé", zurls.length === 1 && zurls[0] === "https://www.strava.com/api/v3/activities/9/zones|Bearer tok" && zr.zones?.length === 1);
+  const pay = await fetchZones("tok", 9, async () => respE(402, {}));
+  check("client zones : abonnement requis, aucune zone marquée lue", pay.zones?.length === 0 && pay.stopped === null);
+  const refused = await fetchZones("tok", 9, async () => respE(403, {}));
+  check("client zones : droit refusé, rien de marqué", refused.zones === null && refused.stopped?.kind === "autorisation");
+  const quotaZ = await fetchZones("tok", 9, async () => respE(429, {}));
+  check("client zones : quota, rien de marqué", quotaZ.zones === null && quotaZ.stopped?.kind === "quota");
+
+  const needs = (x: Partial<Activity>, withZones = false) => needsDetail({ id: "a", date: "2026-10-01", km: 5, minutes: 30, ...x }, withZones);
+  const fresh = { splits: [], ver: 2, series: { t: [], ver: 2 }, zones: [] };
+  check("à lire : rien lu, détail ancien, courbes anciennes", needs({}) && needs({ detail: { splits: [], series: { t: [], ver: 2 } } }) && needs({ detail: { splits: [], ver: 2, series: { t: [] } } }) && needs({ detail: { splits: [], ver: 2 } }));
+  check("à lire : tout à jour, rien à relire ; zones seulement si le droit existe", !needs({ detail: fresh }) && !needs({ detail: { ...fresh, zones: undefined } }) && needs({ detail: { ...fresh, zones: undefined } }, true) && !needs({ detail: fresh }, true));
+
+  // Compte
+  const stats = parseStats({ recent_run_totals: { count: 4, distance: 31234, moving_time: 11000, elevation_gain: 120.4 }, ytd_run_totals: { count: 90, distance: 800000, moving_time: 300000, elevation_gain: 5000 }, all_run_totals: { count: "x" } })!;
+  check("compte : totaux de course", stats.recent?.km === 31.2 && stats.recent.count === 4 && stats.recent.elevation === 120 && stats.year?.km === 800 && stats.all === undefined, stats);
+  check("compte : réponse illisible", parseStats(null) === null && parseAthlete(null) === null && parseClubs({}) === null && parseRoutes("x") === null);
+  const ath = parseAthlete({ id: 77, firstname: "Secret", shoes: [{ id: "g1", name: "Pegasus 40", distance: 512345 }, { id: "g2", name: "", distance: 1 }, { name: "x" }] })!;
+  check("compte : identifiant et chaussures, rien d'autre du profil", ath.id === 77 && ath.shoes.length === 1 && ath.shoes[0].km === 512 && !("firstname" in ath), ath);
+  const clubs = parseClubs([{ id: 1, name: "Les Foulées", member_count: 120, city: "Lyon" }, { id: 2 }, { id: 3, name: "Trail" }])!;
+  check("compte : clubs", clubs.length === 2 && clubs[0].members === 120 && clubs[0].city === "Lyon" && clubs[1].members === undefined);
+  const routes = parseRoutes([
+    { id: 1, name: "Boucle du lac", type: 2, distance: 10250, elevation_gain: 85.5, map: { summary_polyline: "_p~iF~ps|U_ulLnnqC_mqNvxq`@" } },
+    { id: 2, name: "Vélo", type: 1, distance: 40000 },
+  ])!;
+  check("compte : seuls les itinéraires de course", routes.length === 1 && routes[0].km === 10.3 && routes[0].elevation === 86 && routes[0].route?.length === 3, routes);
+
+  const base = "https://www.strava.com/api/v3";
+  const asked: string[] = [];
+  const fakeApi = (statusFor: (u: string) => number): FetchLike => async (u) => {
+    asked.push(u);
+    const st = statusFor(u);
+    if (st !== 200) return respE(st, {});
+    if (u === base + "/athlete") return respE(200, { id: 77, shoes: [{ id: "g1", name: "Pegasus 40", distance: 400000 }] });
+    if (u.endsWith("/stats")) return respE(200, { recent_run_totals: { count: 1, distance: 5000, moving_time: 1500, elevation_gain: 10 } });
+    if (u.endsWith("/athlete/clubs")) return respE(200, [{ id: 1, name: "Club" }]);
+    if (u.includes("/routes")) return respE(200, [{ id: 5, name: "Parcours", type: 2, distance: 8000 }]);
+    return respE(404, {});
+  };
+  const all = await fetchAccount({ scopes: STRAVA_SCOPE.split(",") }, "tok", 1234, fakeApi(() => 200));
+  check("client compte : tout lu avec tous les droits", all.athleteId === 77 && all.loadedAt === 1234 && all.shoes?.length === 1 && all.totals?.recent?.count === 1 && all.clubs?.length === 1 && all.routes?.length === 1, all);
+  check("client compte : identifiant lu avant les totaux", asked[0] === base + "/athlete" && asked.includes(base + "/athletes/77/stats") && asked.includes(base + "/athletes/77/routes?per_page=50"), asked);
+  asked.length = 0;
+  const basic = await fetchAccount({}, "tok", 1, fakeApi(() => 200));
+  check("client compte : sans les droits en plus, ni chaussures ni itinéraires (et pas de requête d'itinéraires)", basic.shoes === undefined && basic.routes === undefined && basic.totals !== undefined && !asked.some((u) => u.includes("/routes")), basic);
+  const partial = await fetchAccount({ scopes: STRAVA_SCOPE.split(",") }, "tok", 1, fakeApi((u) => (u.includes("/routes") || u.endsWith("/clubs") ? 403 : 200)));
+  check("client compte : une rubrique refusée n'empêche pas les autres", partial.routes === undefined && partial.clubs === undefined && partial.shoes?.length === 1 && partial.totals !== undefined);
+  let refusedErr: StravaError | null = null;
+  try {
+    await fetchAccount({}, "tok", 1, async () => respE(401, {}));
+  } catch (e) {
+    refusedErr = e as StravaError;
+  }
+  check("client compte : accès refusé dès le profil, erreur claire", refusedErr?.kind === "autorisation");
+  let quotaErr: StravaError | null = null;
+  try {
+    await fetchAccount({ scopes: STRAVA_SCOPE.split(",") }, "tok", 1, fakeApi((u) => (u.endsWith("/stats") ? 429 : 200)));
+  } catch (e) {
+    quotaErr = e as StravaError;
+  }
+  check("client compte : quota remonté", quotaErr?.kind === "quota");
+
+  // Sauvegarde du détail étendu
+  const full = { ...d, series: { ...se, ver: 2 }, zones: zones! };
+  const text = makeBackup({ ...EMPTY_SNAPSHOT, plan, activities: [{ id: "x1", date: "2026-10-01", km: 6, minutes: 36, externalId: "strava:1", source: "strava", detail: full }], done: {}, confirmed: true }, new Date());
+  const rt = parseBackup(text);
+  check("sauvegarde : le détail étendu survit à l'aller-retour", rt.ok && rt.data.activities[0].detail?.segments?.length === 2 && rt.data.activities[0].detail?.zones?.[0].buckets.length === 3 && rt.data.activities[0].detail?.series?.route?.length === se.t.length && rt.data.activities[0].detail?.gear?.name === "Pegasus 40", rt);
+  const brk = JSON.parse(text);
+  brk.data.activities[0].detail.series.route.pop();
+  check("sauvegarde : tracé de longueur différente refusé", !parseBackup(JSON.stringify(brk)).ok);
+  const brk2 = JSON.parse(text);
+  brk2.data.activities[0].detail.workoutType = "marathon";
+  check("sauvegarde : type de sortie inconnu refusé", !parseBackup(JSON.stringify(brk2)).ok);
+  const brk3 = JSON.parse(text);
+  brk3.data.activities[0].detail.zones[0].type = "pace";
+  check("sauvegarde : type de zone inconnu refusé", !parseBackup(JSON.stringify(brk3)).ok);
+}
 
 console.log(failures === 0 ? "\nTout est bon." : `\n${failures} échec(s).`);
 process.exit(failures === 0 ? 0 : 1);

@@ -4,6 +4,7 @@ import { FEELINGS, groupByMonth, paceOf, parseMinutes, type Activity, type Month
 import { fmtDate, fmtDuration, fmtKm, fmtPace } from "../lib/format";
 import { todayISO } from "../storage";
 import type { StravaApi } from "../useStrava";
+import { hasScope } from "../lib/strava";
 import { fmtSync } from "./StravaCard";
 import { PaceCheck } from "./PaceCard";
 import ActivityDetail from "./ActivityDetail";
@@ -244,7 +245,7 @@ export default function Activities({ plan, done, activities, presetSessionId, on
                 {a.note && <p className="hint">{a.note}</p>}
                 {openIds[a.id] && (
                   <>
-                    <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} />
+                    <ActivityDetail activity={a} onLoad={strava.loadDetail} connected={strava.connected} zonesGranted={hasScope(strava.state, "profile:read_all")} />
                     <div className="activity__actions">
                       <button type="button" className="link" onClick={() => onOpenNutrition(a.date)}>
                         Nutrition de ce jour

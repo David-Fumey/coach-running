@@ -31,7 +31,52 @@ export interface RunDetail {
   device?: string;
   /** Courbes dans le temps (lues à part ; absentes tant qu'elles n'ont pas été lues) */
   series?: Series;
+  /** Version de lecture du détail : en dessous de DETAIL_VERSION, il est relu à l'ouverture de la sortie */
+  ver?: number;
+  /** Vitesse maximale, en km/h */
+  maxSpeedKmh?: number;
+  /** Altitude la plus haute et la plus basse, en mètres */
+  elevHigh?: number;
+  elevLow?: number;
+  /** Puissance (capteur ou montre compatible), en watts */
+  watts?: { avg?: number; max?: number; weighted?: number };
+  /** Texte saisi sur Strava */
+  description?: string;
+  /** Type de sortie choisi sur Strava */
+  workoutType?: "race" | "long" | "workout";
+  /** Chaussures ou matériel utilisé */
+  gear?: { id: string; name: string };
+  /** Départ et arrivée : [latitude, longitude] */
+  start?: [number, number];
+  end?: [number, number];
+  /** Tracé simplifié (une soixantaine de points [latitude, longitude]), repris de la carte Strava */
+  route?: [number, number][];
+  /** Segments Strava parcourus */
+  segments?: SegmentEffort[];
+  /** Temps passé dans chaque zone de fréquence cardiaque et de puissance. Tableau vide : Strava n'en fournit pas. */
+  zones?: Zones[];
 }
+
+/** Un segment Strava parcouru pendant la sortie. */
+export interface SegmentEffort {
+  name: string;
+  /** mètres */
+  meters: number;
+  seconds: number;
+  /** Rang personnel sur ce segment (1 = meilleur temps), s'il est connu */
+  prRank?: number;
+  hr?: number;
+}
+
+/** Répartition du temps dans les zones d'un capteur. */
+export interface Zones {
+  type: "heartrate" | "power";
+  /** Une entrée par zone, de la plus douce à la plus intense ; max = -1 pour la dernière (sans limite) */
+  buckets: { min: number; max: number; seconds: number }[];
+}
+
+/** 2 : détails étendus (puissance, matériel, tracé, segments, zones). */
+export const DETAIL_VERSION = 2;
 
 /**
  * Courbes d'une sortie, ramenées à une centaine de points. Les tableaux ont tous la longueur de `t`.
@@ -46,6 +91,20 @@ export interface Series {
   pace?: number[];
   /** Altitude, mètres */
   alt?: number[];
+  /** Cadence, pas par minute */
+  cadence?: number[];
+  /** Puissance, watts */
+  watts?: number[];
+  /** Température, °C (0 = inconnue) */
+  temp?: number[];
+  /** Pente, en % (négative en descente) */
+  grade?: number[];
+  /** Position : [latitude, longitude] à chaque point */
+  route?: [number, number][];
+  /** Version de lecture des courbes (voir DETAIL_VERSION) */
+  ver?: number;
+  /** Temps passé à l'arrêt, en secondes */
+  stopped?: number;
 }
 
 export interface Activity {
